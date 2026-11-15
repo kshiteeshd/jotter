@@ -12,7 +12,7 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 
 - **Top bar**: Home, show/hide the sidebar, the notebook name (click to rename) and current section, then the save dot, search, export as PDF and Settings. The dot is green when everything is saved, amber while saving, red if something could not be saved.
 - **Sidebar**: sections at the top, the pages of the current section below. Right-click a section or page for rename, colour, duplicate, move and delete. Drag pages to reorder them or onto a section to move them.
-- **Tool rail** on the right: Type, Pen, Marker, Eraser, Shapes and Select, then Undo and Redo. The options of the chosen tool (colours, sizes, text styles, insert) sit in the column beside the tools; the arrow at the top folds that column away. While you draw, the rail fades so it never covers your line.
+- **Tool bar**: Type, Pen, Marker, Eraser, Shapes and Select, then Undo and Redo, with the chosen tool's options (colours, sizes, text styles, insert) beside them. It sits on the right at first; drag its grip (the six dots) to the left, top or bottom edge, or choose the side in **Settings → Tool bar**. The arrow folds the options away. While you draw, the bar fades so it never covers your line.
 - **Page title row**: the page name and the page type and paper switches stay fixed above the page while you scroll or zoom. The page is centred in the window.
 
 ## Writing
@@ -43,7 +43,7 @@ Notebooks save themselves a moment after every change. Every ten minutes of work
 
 ## View
 
-Zoom with Ctrl + mouse wheel or touchpad pinch (it zooms around the pointer), Ctrl+= / Ctrl+- / Ctrl+0, or the zoom control in the top bar. **Focus mode** (Ctrl+Shift+F) hides everything but the page and the tools; Esc leaves it. **F11** is full screen. Settings has light, dark or system theme, three interface sizes, and *Draw with the pen only* for touch screens.
+The page fits the window by itself: actual size when there is room, smaller in a narrow window. Zoom with Ctrl + mouse wheel or touchpad pinch (it zooms around the pointer), Ctrl+= / Ctrl+-, or the zoom control in the top bar; Ctrl+0 (or clicking the percentage) fits the page to the window again. **Focus mode** (Ctrl+Shift+F) hides everything but the page and the tools; Esc leaves it. **F11** is full screen. Settings has light, dark or system theme, three interface sizes, and *Draw with the pen only* for touch screens.
 
 ## Keyboard shortcuts
 

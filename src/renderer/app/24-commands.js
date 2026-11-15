@@ -68,7 +68,10 @@ const commands = {
   'delete-page': () => deletePage(state.pageIdx),
   'zoom-in': () => stepZoom(1),
   'zoom-out': () => stepZoom(-1),
-  'zoom-reset': () => setZoom(1),
+  'zoom-reset': () => {
+    state.userZoomed = false;
+    setZoom(fitZoom());
+  },
   'toggle-sidebar': () => applySettings({ sidebar: !state.settings.sidebar }),
   'toggle-rail': () => setRailCollapsed(!document.body.classList.contains('rail-collapsed')),
   'toggle-focus': () => setFocusMode(!document.body.classList.contains('focus')),

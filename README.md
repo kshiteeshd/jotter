@@ -16,6 +16,7 @@ Get the latest installer, `Jotter-Setup-<version>.exe`, from the **Releases** pa
 - **Paged A4 sheets or one infinite page**; plain, ruled, grid, dot or kolam paper in six paper colours.
 - **Always saved**: autosave, a recovery copy if Jotter closes unexpectedly, and version history you can restore.
 - **Export** as PDF (vector ink), page image, Markdown, or print.
+- A tool bar you can dock to any edge, a page that fits and centres itself in any window size.
 - Search across a notebook, focus mode, full screen, light and dark themes, 24 original covers.
 
 See the [user guide](docs/USER-GUIDE.md) for how everything works.

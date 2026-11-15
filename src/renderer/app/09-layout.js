@@ -29,28 +29,30 @@ function centrePage() {
   const wr = ws.getBoundingClientRect();
   const railRoom = parseFloat(getComputedStyle(document.body).getPropertyValue('--rail-room')) || 0;
   const mid = window.innerWidth / 2 - wr.left; // window centre, measured from the workspace's left edge
+  // Keep clear of the tool bar on whichever side it is docked.
+  const dock = document.body.dataset.dock;
+  const minLeft = dock === 'left' ? railRoom : MIN_GAP;
+  const minRight = dock === 'right' ? railRoom : MIN_GAP;
+  const place = (width, span) => Math.max(minLeft, Math.min(mid - width / 2, span - minRight - width));
+  // The title row matches the page at its fitted size: it lines up with the page at any window size, and
+  // stays where it is when you zoom in or out yourself.
+  const fitW = W * fitZoom();
+  placeTitleRow(place(fitW, wr.width), Math.max(fitW, 480), wr.width, minRight);
   if (page().mode === 'infinite') {
     ws.style.paddingLeft = '';
     const z = state.zoom;
-    const span = ws.clientWidth / z; // paper width in sheet units
-    const left = Math.max(0, Math.min(mid / z - W / 2, span - W - railRoom / z));
-    el.editor.style.marginLeft = `${Math.round(left)}px`;
-    placeTitleRow(mid, wr.width, railRoom);
+    el.editor.style.marginLeft = `${Math.round(Math.max(0, place(W * z, ws.clientWidth)) / z)}px`;
     return;
   }
   el.editor.style.marginLeft = '';
-  placeTitleRow(mid, wr.width, railRoom);
-  const sheetW = el.sheetWrap.getBoundingClientRect().width;
-  const left = Math.max(MIN_GAP, Math.min(mid - sheetW / 2, ws.clientWidth - railRoom - sheetW));
-  ws.style.paddingLeft = `${Math.round(left)}px`;
+  ws.style.paddingLeft = `${Math.round(place(el.sheetWrap.getBoundingClientRect().width, ws.clientWidth))}px`;
 }
 
 // The title row sits over the page's column at its normal size: it does not scroll or zoom with the page.
-function placeTitleRow(mid, width, railRoom) {
+function placeTitleRow(left, rowW, width, minRight) {
   const row = el.pageTitle.parentElement;
-  const left = Math.max(MIN_GAP, Math.min(mid - W / 2, width - railRoom - W));
   row.style.paddingLeft = `${Math.round(left)}px`;
-  row.style.paddingRight = `${Math.round(Math.max(railRoom, width - left - W))}px`;
+  row.style.paddingRight = `${Math.round(Math.max(minRight, width - left - rowW))}px`;
 }
 
 function layoutSheets() {
@@ -206,6 +208,7 @@ function onViewportChange() {
   requestAnimationFrame(() => {
     viewQueued = false;
     if (!state.nb || state.view !== 'editor') return;
+    autoZoom();
     centrePage();
     ensureRoom(viewBottom());
     updateTiles();

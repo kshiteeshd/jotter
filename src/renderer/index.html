@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="content.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body data-view="home" data-tool="text" data-mode="paged">
+<body data-view="home" data-tool="text" data-mode="paged" data-dock="right">
   <!-- Icon set drawn for Jotter: 24 px grid, one line weight, round ends; every dot or knob is a kolam diamond. -->
   <svg id="icons" aria-hidden="true">
     <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.3 12 4l8 6.3V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z"/><path class="d" d="M12 8.9l1.5 1.5-1.5 1.5-1.5-1.5z"/></symbol>
@@ -73,7 +73,7 @@
       <span id="save-state" data-state="saved" title="All changes saved"><i aria-hidden="true"></i><span></span></span>
       <div id="zoom-ctl" role="group" aria-label="Zoom">
         <button class="btn icon small" data-cmd="zoom-out" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
-        <button class="btn small" id="zoom-value" data-cmd="zoom-reset" title="Actual size (Ctrl+0)">100%</button>
+        <button class="btn small" id="zoom-value" data-cmd="zoom-reset" title="Fit the page to the window (Ctrl+0)">100%</button>
         <button class="btn icon small" data-cmd="zoom-in" title="Zoom in (Ctrl+=)" aria-label="Zoom in">+</button>
       </div>
       <button class="btn icon" id="btn-search" data-cmd="find" title="Search this notebook (Ctrl+F)" aria-label="Search" aria-haspopup="dialog" aria-expanded="false"><svg class="ic"><use href="#i-search"/></svg></button>
@@ -137,6 +137,84 @@
           <button id="extend" data-cmd="extend-page" title="Add another A4 sheet to the end of this page"><svg class="ic"><use href="#i-plus"/></svg>Add a sheet</button>
         </div>
       </main>
+      <!-- The tool bar: the tools, and beside them the chosen tool's options. It docks to any edge of the page area
+           (drag the grip, or Settings), the tools never move, and the options can be folded away. -->
+      <div id="dock" role="toolbar" aria-label="Tools">
+        <div class="opts" id="tool-options" aria-label="Tool options">
+          <div class="opt" id="text-options">
+            <select id="block-style" title="Text style" aria-label="Text style">
+              <option value="div" title="Normal text">Aa</option>
+              <option value="h1" title="Title">H1</option>
+              <option value="h2" title="Heading">H2</option>
+              <option value="h3" title="Subheading">H3</option>
+            </select>
+            <button class="btn icon fmt" data-fmt="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
+            <button class="btn icon fmt" data-fmt="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
+            <button class="btn icon fmt" data-fmt="underline" title="Underline (Ctrl+U)" aria-label="Underline"><u>U</u></button>
+            <button class="btn icon fmt" data-fmt="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list"><svg class="ic"><use href="#i-bullets"/></svg></button>
+            <button class="btn icon fmt" data-fmt="insertOrderedList" title="Numbered list" aria-label="Numbered list"><svg class="ic"><use href="#i-numbers"/></svg></button>
+            <button class="btn icon" data-cmd="insert-checklist" title="Checklist" aria-label="Checklist"><svg class="ic"><use href="#i-checklist"/></svg></button>
+          </div>
+          <div class="opt" id="insert-options">
+            <button class="btn icon" data-cmd="insert-table" title="Table" aria-label="Table"><svg class="ic"><use href="#i-table"/></svg></button>
+            <button class="btn icon" data-cmd="insert-image" title="Image" aria-label="Image"><svg class="ic"><use href="#i-image"/></svg></button>
+            <button class="btn icon" data-cmd="insert-link" title="Link" aria-label="Link"><svg class="ic"><use href="#i-link"/></svg></button>
+            <button class="btn icon" data-cmd="insert-textbox" title="Text box anywhere on the page" aria-label="Text box"><svg class="ic"><use href="#i-textbox"/></svg></button>
+          </div>
+          <div class="opt" id="shape-options">
+            <div class="seg" id="shape-kind" role="radiogroup" aria-label="Shape">
+              <button data-value="line" role="radio" title="Line (Shift keeps it straight)" aria-label="Line"><svg class="ic"><use href="#i-line"/></svg></button>
+              <button data-value="arrow" role="radio" title="Arrow" aria-label="Arrow"><svg class="ic"><use href="#i-arrow"/></svg></button>
+              <button data-value="rect" role="radio" title="Rectangle (Shift makes a square)" aria-label="Rectangle"><svg class="ic"><use href="#i-rect"/></svg></button>
+              <button data-value="ellipse" role="radio" title="Ellipse (Shift makes a circle)" aria-label="Ellipse"><svg class="ic"><use href="#i-ellipse"/></svg></button>
+            </div>
+          </div>
+          <div class="opt" id="color-options">
+            <div id="swatches" role="radiogroup" aria-label="Colour"></div>
+            <label class="custom-color" title="Colour">
+              <input type="color" id="custom-color" value="#1f1b18" aria-label="Colour">
+            </label>
+          </div>
+          <div class="opt" id="size-options">
+            <div class="size-ui" id="size-ui" aria-label="Size">
+              <span class="size-preview" title="Preview"><span id="size-dot"></span></span>
+              <div id="size-presets" class="size-presets" role="group" aria-label="Size presets"></div>
+              <label class="size-fine" title="Fine size ( [ and ] )">
+                <input type="range" id="size" min="1" max="60" step="1" value="3" aria-label="Size">
+                <output id="size-value">3</output>
+              </label>
+            </div>
+          </div>
+          <div class="opt" id="eraser-mode-row">
+            <div class="seg" id="eraser-mode" role="radiogroup" aria-label="Eraser type">
+              <button data-value="rub" role="radio" title="Rub out only what you touch">Rub</button>
+              <button data-value="stroke" role="radio" title="Remove a whole stroke with one touch">Whole</button>
+            </div>
+            <button class="btn small" data-cmd="clear-ink" title="Remove all ink on this page">Clear</button>
+          </div>
+          <div class="opt" id="select-hint">
+            <span class="row-hint">Draw a loop around ink to select it</span>
+          </div>
+        </div>
+        <div class="dock-main">
+          <button class="btn icon" id="btn-dock-grip" title="Drag to dock the tool bar to another edge" aria-label="Move the tool bar"><svg class="ic"><use href="#i-grip"/></svg></button>
+          <button class="btn icon" id="btn-rail" data-cmd="toggle-rail" title="Hide tool options" aria-label="Hide tool options" aria-expanded="true"><svg class="ic"><use href="#i-chevron"/></svg></button>
+          <span class="dock-sep" aria-hidden="true"></span>
+        <div class="tools" id="tools" role="radiogroup" aria-label="Tool">
+          <button class="btn icon tool" data-tool="text" role="radio" title="Type (T)" aria-label="Type"><svg class="ic"><use href="#i-type"/></svg></button>
+          <button class="btn icon tool" data-tool="pen" role="radio" title="Pen (P)" aria-label="Pen"><svg class="ic"><use href="#i-pen"/></svg></button>
+          <button class="btn icon tool" data-tool="marker" role="radio" title="Marker (M)" aria-label="Marker"><svg class="ic"><use href="#i-marker"/></svg></button>
+          <button class="btn icon tool" data-tool="eraser" role="radio" title="Eraser (E)" aria-label="Eraser"><svg class="ic"><use href="#i-eraser"/></svg></button>
+          <button class="btn icon tool" data-tool="shape" role="radio" title="Shapes (S)" aria-label="Shapes"><svg class="ic"><use href="#i-shapes"/></svg></button>
+          <button class="btn icon tool" data-tool="select" role="radio" title="Select ink (L)" aria-label="Select ink"><svg class="ic"><use href="#i-lasso"/></svg></button>
+        </div>
+          <span class="dock-sep" aria-hidden="true"></span>
+          <button class="btn icon" data-cmd="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="ic"><use href="#i-undo"/></svg></button>
+          <button class="btn icon" data-cmd="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg class="ic"><use href="#i-redo"/></svg></button>
+          <button class="btn icon focus-only" id="btn-focus-exit" data-cmd="toggle-focus" title="Leave focus mode (Esc)" aria-label="Leave focus mode"><svg class="ic"><use href="#i-close"/></svg></button>
+        </div>
+      </div>
+      <div id="dock-ghost" aria-hidden="true"></div>
     </div>
 
     <main id="home">
@@ -191,82 +269,6 @@
     </main>
   </div>
 
-
-  <!-- The tool rail stands at the right edge: the chosen tool's options in one column, the tools in the other. The tools never move; the options column can be collapsed. -->
-  <div id="dock" role="toolbar" aria-label="Tools">
-    <div class="opts" id="tool-options" aria-label="Tool options">
-      <div class="opt" id="text-options">
-        <select id="block-style" title="Text style" aria-label="Text style">
-          <option value="div" title="Normal text">Aa</option>
-          <option value="h1" title="Title">H1</option>
-          <option value="h2" title="Heading">H2</option>
-          <option value="h3" title="Subheading">H3</option>
-        </select>
-        <button class="btn icon fmt" data-fmt="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
-        <button class="btn icon fmt" data-fmt="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
-        <button class="btn icon fmt" data-fmt="underline" title="Underline (Ctrl+U)" aria-label="Underline"><u>U</u></button>
-        <button class="btn icon fmt" data-fmt="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list"><svg class="ic"><use href="#i-bullets"/></svg></button>
-        <button class="btn icon fmt" data-fmt="insertOrderedList" title="Numbered list" aria-label="Numbered list"><svg class="ic"><use href="#i-numbers"/></svg></button>
-        <button class="btn icon" data-cmd="insert-checklist" title="Checklist" aria-label="Checklist"><svg class="ic"><use href="#i-checklist"/></svg></button>
-      </div>
-      <div class="opt" id="insert-options">
-        <button class="btn icon" data-cmd="insert-table" title="Table" aria-label="Table"><svg class="ic"><use href="#i-table"/></svg></button>
-        <button class="btn icon" data-cmd="insert-image" title="Image" aria-label="Image"><svg class="ic"><use href="#i-image"/></svg></button>
-        <button class="btn icon" data-cmd="insert-link" title="Link" aria-label="Link"><svg class="ic"><use href="#i-link"/></svg></button>
-        <button class="btn icon" data-cmd="insert-textbox" title="Text box anywhere on the page" aria-label="Text box"><svg class="ic"><use href="#i-textbox"/></svg></button>
-      </div>
-      <div class="opt" id="shape-options">
-        <div class="seg" id="shape-kind" role="radiogroup" aria-label="Shape">
-          <button data-value="line" role="radio" title="Line (Shift keeps it straight)" aria-label="Line"><svg class="ic"><use href="#i-line"/></svg></button>
-          <button data-value="arrow" role="radio" title="Arrow" aria-label="Arrow"><svg class="ic"><use href="#i-arrow"/></svg></button>
-          <button data-value="rect" role="radio" title="Rectangle (Shift makes a square)" aria-label="Rectangle"><svg class="ic"><use href="#i-rect"/></svg></button>
-          <button data-value="ellipse" role="radio" title="Ellipse (Shift makes a circle)" aria-label="Ellipse"><svg class="ic"><use href="#i-ellipse"/></svg></button>
-        </div>
-      </div>
-      <div class="opt" id="color-options">
-        <div id="swatches" role="radiogroup" aria-label="Colour"></div>
-        <label class="custom-color" title="Colour">
-          <input type="color" id="custom-color" value="#1f1b18" aria-label="Colour">
-        </label>
-      </div>
-      <div class="opt" id="size-options">
-        <div class="size-ui" id="size-ui" aria-label="Size">
-          <span class="size-preview" title="Preview"><span id="size-dot"></span></span>
-          <div id="size-presets" class="size-presets" role="group" aria-label="Size presets"></div>
-          <label class="size-fine" title="Fine size ( [ and ] )">
-            <input type="range" id="size" min="1" max="60" step="1" value="3" aria-label="Size">
-            <output id="size-value">3</output>
-          </label>
-        </div>
-      </div>
-      <div class="opt" id="eraser-mode-row">
-        <div class="seg" id="eraser-mode" role="radiogroup" aria-label="Eraser type">
-          <button data-value="rub" role="radio" title="Rub out only what you touch">Rub</button>
-          <button data-value="stroke" role="radio" title="Remove a whole stroke with one touch">Whole</button>
-        </div>
-        <button class="btn small" data-cmd="clear-ink" title="Remove all ink on this page">Clear</button>
-      </div>
-      <div class="opt" id="select-hint">
-        <span class="row-hint">Draw a loop around ink to select it</span>
-      </div>
-    </div>
-    <div class="dock-main">
-      <button class="btn icon" id="btn-rail" data-cmd="toggle-rail" title="Hide tool options" aria-label="Hide tool options" aria-expanded="true"><svg class="ic"><use href="#i-chevron"/></svg></button>
-      <span class="dock-sep" aria-hidden="true"></span>
-    <div class="tools" id="tools" role="radiogroup" aria-label="Tool">
-      <button class="btn icon tool" data-tool="text" role="radio" title="Type (T)" aria-label="Type"><svg class="ic"><use href="#i-type"/></svg></button>
-      <button class="btn icon tool" data-tool="pen" role="radio" title="Pen (P)" aria-label="Pen"><svg class="ic"><use href="#i-pen"/></svg></button>
-      <button class="btn icon tool" data-tool="marker" role="radio" title="Marker (M)" aria-label="Marker"><svg class="ic"><use href="#i-marker"/></svg></button>
-      <button class="btn icon tool" data-tool="eraser" role="radio" title="Eraser (E)" aria-label="Eraser"><svg class="ic"><use href="#i-eraser"/></svg></button>
-      <button class="btn icon tool" data-tool="shape" role="radio" title="Shapes (S)" aria-label="Shapes"><svg class="ic"><use href="#i-shapes"/></svg></button>
-      <button class="btn icon tool" data-tool="select" role="radio" title="Select ink (L)" aria-label="Select ink"><svg class="ic"><use href="#i-lasso"/></svg></button>
-    </div>
-      <span class="dock-sep" aria-hidden="true"></span>
-      <button class="btn icon" data-cmd="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="ic"><use href="#i-undo"/></svg></button>
-      <button class="btn icon" data-cmd="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg class="ic"><use href="#i-redo"/></svg></button>
-      <button class="btn icon focus-only" id="btn-focus-exit" data-cmd="toggle-focus" title="Leave focus mode (Esc)" aria-label="Leave focus mode"><svg class="ic"><use href="#i-close"/></svg></button>
-    </div>
-  </div>
 
   <span id="status-msg" role="status" aria-live="polite"></span>
 
@@ -365,6 +367,8 @@
           <div class="seg" id="theme" role="radiogroup" aria-label="App theme"><button data-value="system" role="radio">System</button><button data-value="light" role="radio">Light</button><button data-value="dark" role="radio">Dark</button></div></div>
         <div class="set-row"><span>Interface size</span>
           <div class="seg" id="ui-scale" role="radiogroup" aria-label="Interface size"><button data-value="1" role="radio">Normal</button><button data-value="1.15" role="radio">Large</button><button data-value="1.3" role="radio">Larger</button></div></div>
+        <div class="set-row"><span>Tool bar<small>Or drag its grip to any edge.</small></span>
+          <div class="seg" id="set-dock" role="radiogroup" aria-label="Tool bar position"><button data-value="left" role="radio">Left</button><button data-value="top" role="radio">Top</button><button data-value="bottom" role="radio">Bottom</button><button data-value="right" role="radio">Right</button></div></div>
       </section>
       <section>
         <h3>New notebooks</h3>
@@ -442,7 +446,7 @@
         <dt>Ctrl+Shift+F</dt><dd>Focus mode</dd>
         <dt>Ctrl+\</dt><dd>Show / hide sidebar</dd>
         <dt>Ctrl+= &nbsp; Ctrl+-</dt><dd>Zoom in / out</dd>
-        <dt>Ctrl+0</dt><dd>Actual size</dd>
+        <dt>Ctrl+0</dt><dd>Fit the page to the window</dd>
         <dt>Ctrl+H</dt><dd>Home</dd>
         <dt>Esc</dt><dd>Close a panel, leave focus mode</dd>
       </dl></div>

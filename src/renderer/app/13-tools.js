@@ -153,3 +153,67 @@ function setRailCollapsed(on) {
 try {
   if (localStorage.getItem('railCollapsed')) setRailCollapsed(true);
 } catch {}
+
+// ---------- Docking the tool bar ----------
+
+const DOCK_SIDES = ['right', 'left', 'top', 'bottom'];
+
+function setDockSide(side) {
+  if (!DOCK_SIDES.includes(side)) side = 'right';
+  document.body.dataset.dock = side;
+  setSeg('set-dock', side);
+  try {
+    localStorage.setItem('dockSide', side);
+  } catch {}
+  onViewportChange();
+}
+try {
+  setDockSide(localStorage.getItem('dockSide') || 'right');
+} catch {
+  setDockSide('right');
+}
+bindSeg('set-dock', setDockSide);
+
+// The edge of the page area nearest to a point (measured relative to the area's size).
+function nearestSide(x, y) {
+  const r = document.getElementById('page-area').getBoundingClientRect();
+  const d = { left: (x - r.left) / r.width, right: (r.right - x) / r.width, top: (y - r.top) / r.height, bottom: (r.bottom - y) / r.height };
+  return DOCK_SIDES.reduce((a, b) => (d[b] < d[a] ? b : a));
+}
+
+// Drag the grip anywhere; on release the bar docks to the nearest edge, which lights up meanwhile.
+(() => {
+  const grip = $('btn-dock-grip');
+  const ghost = $('dock-ghost');
+  let drag = null;
+  grip.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    drag = { id: e.pointerId };
+    try {
+      grip.setPointerCapture(e.pointerId);
+    } catch {}
+    document.body.classList.add('dock-dragging');
+    ghost.dataset.side = document.body.dataset.dock;
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (drag && e.pointerId === drag.id) ghost.dataset.side = nearestSide(e.clientX, e.clientY);
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    document.body.classList.remove('dock-dragging');
+    const side = ghost.dataset.side;
+    delete ghost.dataset.side;
+    if (side && side !== document.body.dataset.dock) setDockSide(side);
+  };
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+  // From the keyboard: arrow keys move the bar to that edge.
+  grip.addEventListener('keydown', (e) => {
+    const side = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'top', ArrowDown: 'bottom' }[e.key];
+    if (!side) return;
+    e.preventDefault();
+    setDockSide(side);
+  });
+})();

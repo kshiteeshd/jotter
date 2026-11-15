@@ -21,7 +21,23 @@ function setZoom(z, cx, cy) {
   }
   onViewportChange();
 }
+/*
+  Until you zoom yourself, the page is sized to fit the window: actual size when there is room, smaller
+  (down to 50%) in a narrow window so it stays clear of the sidebar and the tool bar. Ctrl+0 returns to this.
+*/
+function fitZoom() {
+  const room = parseFloat(getComputedStyle(document.body).getPropertyValue('--rail-room')) || 0;
+  const avail = el.workspace.clientWidth - 2 * Math.max(room, 16);
+  return Math.min(1, Math.max(0.5, Math.floor((avail / W) * 100) / 100));
+}
+function autoZoom() {
+  if (state.userZoomed || state.view !== 'editor') return;
+  const z = fitZoom();
+  if (Math.abs(z - state.zoom) > 0.005) setZoom(z);
+}
+
 function stepZoom(dir) {
+  state.userZoomed = true;
   const next = dir > 0 ? ZOOMS.find((z) => z > state.zoom + 0.001) : [...ZOOMS].reverse().find((z) => z < state.zoom - 0.001);
   if (next) setZoom(next);
 }
@@ -30,6 +46,7 @@ el.workspace.addEventListener(
   (e) => {
     if (!e.ctrlKey) return;
     e.preventDefault();
+    state.userZoomed = true;
     // Ctrl+wheel and touchpad pinch: glide in or out around the pointer.
     setZoom(state.zoom * Math.exp(-Math.max(-120, Math.min(120, e.deltaY)) * 0.0022), e.clientX, e.clientY);
   },

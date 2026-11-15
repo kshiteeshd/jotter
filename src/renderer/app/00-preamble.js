@@ -68,6 +68,7 @@ const state = {
   view: 'home',
   tool: 'text',
   zoom: 1,
+  userZoomed: false, // the page fits the window until you zoom yourself
   fullscreen: false,
   version: '',
   settings: { theme: 'system', uiScale: 1, autosave: true, sidebar: true, paperColor: 'white', eraserMode: 'rub', defaultCover: 'kolam', defaultPaper: 'plain', defaultMode: 'paged', penOnly: false, historyLimit: 30 },

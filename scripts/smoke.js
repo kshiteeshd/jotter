@@ -210,11 +210,54 @@ app.whenReady().then(async () => {
   await js(`run('toggle-rail'); setTool('marker'); 0`);
   const rowAt = `(() => { const r = document.getElementById('title-row').getBoundingClientRect(); const t = el.pageTitle.getBoundingClientRect(); return [r.top, r.height, t.left, t.width].map(Math.round).join(); })()`;
   const rowBefore = await js(rowAt);
-  await js(`el.workspace.scrollTop = 400; setZoom(1.5); 0`);
+  await js(`el.workspace.scrollTop = 400; state.userZoomed = true; setZoom(1.5); 0`);
   await sleep(150);
   const rowAfter = await js(rowAt);
-  await js(`setZoom(1); el.workspace.scrollTop = 0; 0`);
+  await js(`run('zoom-reset'); el.workspace.scrollTop = 0; 0`);
   check('the title row stays fixed while the page scrolls and zooms', rowBefore === rowAfter, `${rowBefore} / ${rowAfter}`);
+
+  // ----- The tool bar docks to every edge, and everything lines up at every window size -----
+  fs.mkdirSync(path.join(out, 'layout'), { recursive: true });
+  const layoutProblems = [];
+  for (const [w, h] of [[860, 560], [1100, 700], [1400, 900], [1920, 1080]]) {
+    win.setSize(w, h);
+    for (const side of ['right', 'left', 'top', 'bottom']) {
+      await js(`setDockSide('${side}'); setTool('pen'); el.workspace.scrollTop = 0; 0`);
+      await sleep(260);
+      const bad = await js(`(() => {
+        const R = (e) => (typeof e === 'string' ? document.querySelector(e) : e).getBoundingClientRect();
+        const over = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+        const area = R('#page-area'), dock = R('#dock'), top = R('#topbar'), side = R('#sidebar'), sheet = R(el.sheet), opts = R('.page-opts');
+        const out = [];
+        if (dock.left < area.left - 1 || dock.right > area.right + 1 || dock.top < area.top - 1 || dock.bottom > area.bottom + 1) out.push('bar outside the page area');
+        if (over(dock, top)) out.push('bar under the title bar');
+        if (side.width && sheet.left < side.right - 1) out.push('page under the sidebar');
+        if (['left', 'right'].includes(document.body.dataset.dock) && over({ ...sheet.toJSON(), top: dock.top, bottom: dock.bottom }, dock)) out.push('page under the bar');
+        const tb = document.getElementById('topbar');
+        if (tb.scrollWidth > tb.clientWidth + 1) out.push('title bar overflows');
+        if (opts.right > area.right + 1) out.push('page switches cut off');
+        const title = R(el.pageTitle);
+        if (Math.abs(title.left + 8 - sheet.left) > 2) out.push('title not lined up with the page');
+        if (sheet.width >= 480 && Math.abs(opts.right - sheet.right) > 2) out.push('page switches not lined up with the page');
+        const tools = document.querySelector('.tools').getBoundingClientRect();
+        if (tools.bottom > area.bottom + 1 || tools.right > area.right + 1) out.push('tools cut off');
+        return out.join(', ');
+      })()`);
+      if (bad) layoutProblems.push(`${w}x${h} ${side}: ${bad}`);
+      fs.writeFileSync(path.join(out, 'layout', `${w}x${h}-${side}.png`), (await wc.capturePage()).toPNG());
+    }
+  }
+  check('tool bar and page line up at every size and edge', !layoutProblems.length, layoutProblems.join(' | '));
+  win.setSize(860, 560);
+  await js(`showHome(); 0`);
+  await sleep(400);
+  check('home fits the smallest window', await js(`(() => { const h = document.getElementById('home'); return h.scrollWidth <= h.clientWidth + 1; })()`));
+  fs.writeFileSync(path.join(out, 'layout', 'home-860x560.png'), (await wc.capturePage()).toPNG());
+  await js(`showEditor(); 0`);
+  await sleep(200);
+  win.setSize(1400, 900);
+  await js(`setDockSide('right'); 0`);
+  await sleep(200);
   await js(`setTool('text'); 0`);
   check('typing shows text options and hides size', (await js(shown('text-options'))) && !(await js(shown('size-options'))));
   await js(`(() => { const li = el.pageList.children[0]; const r = li.getBoundingClientRect();
