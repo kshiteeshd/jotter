@@ -1,0 +1,66 @@
+{
+  "name": "jotter",
+  "version": "3.0.0",
+  "description": "A simple notebook app for typing and handwriting",
+  "main": "src/main.js",
+  "author": "Jotter",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "icon": "electron scripts/make-icon.js",
+    "dist": "electron-builder --win nsis --x64",
+    "test": "node --test scripts/unit.test.js",
+    "test:app": "electron scripts/smoke.js test-output"
+  },
+  "build": {
+    "appId": "com.jotter.notebook",
+    "productName": "Jotter",
+    "copyright": "Copyright © 2026 Jotter",
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jotter",
+      "artifactName": "Jotter-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "uninstallDisplayName": "Jotter"
+    },
+    "fileAssociations": [
+      {
+        "ext": "ntb",
+        "name": "Jotter Notebook",
+        "description": "Jotter Notebook",
+        "role": "Editor",
+        "icon": "ntb"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  }
+}

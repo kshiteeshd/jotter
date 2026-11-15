@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Test output and generated previews
+test-output/
+scripts/icon-sheet.html
+
+# Notebooks and local data never belong in the repository
+*.ntb
+*.log
+.env
+.env.*
+
+# Editor and OS clutter
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,55 @@
+# Jotter
+
+A calm notebook for Windows for typing and handwriting. Notebooks are single `.ntb` files that save themselves as you work.
+
+## Download
+
+Get the latest installer, `Jotter-Setup-<version>.exe`, from the **Releases** page and run it. Jotter installs for the current user and opens `.ntb` files when you double-click them.
+
+> The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC". Choose **More info → Run anyway**.
+
+## What it does
+
+- **Notebooks → sections → pages**, kept in one folder (`Documents\Jotter` by default) and named Book 1, Book 2… until you rename them.
+- **Type and write on the same page**: headings, lists, checklists, tables, images, links and text boxes, under a pen, marker, eraser (rub out or whole stroke), shapes and lasso selection.
+- **Smooth ink**: lines are steadied as you draw, pen strokes taper at both ends, pen pressure is used when there is one, and ink stays sharp at any zoom.
+- **Paged A4 sheets or one infinite page**; plain, ruled, grid, dot or kolam paper in six paper colours.
+- **Always saved**: autosave, a recovery copy if Jotter closes unexpectedly, and version history you can restore.
+- **Export** as PDF (vector ink), page image, Markdown, or print.
+- Search across a notebook, focus mode, full screen, light and dark themes, 24 original covers.
+
+See the [user guide](docs/USER-GUIDE.md) for how everything works.
+
+## Build from source
+
+Requires Node.js 20 or later on Windows.
+
+```bash
+npm install
+npm start          # run the app
+npm test           # unit tests (file format and ink geometry)
+npm run test:app   # end-to-end test in Electron (writes screenshots to test-output/)
+npm run dist       # build the installer into dist/
+```
+
+## Project layout
+
+| Path | What it is |
+| --- | --- |
+| `src/main.js`, `src/main/` | Electron main process: windows, menus, files, settings, export |
+| `src/preload.js` | The small, safe API the page is allowed to use |
+| `src/format.js` | Reading and writing `.ntb` files (a zip of JSON pages and images), history snapshots |
+| `src/print.js` | Builds the printable/PDF version of pages |
+| `src/renderer/` | The interface: `index.html`, `styles.css`, `content.css` |
+| `src/renderer/ink.js` | Ink geometry: smoothing, tapering, erasing, hit-testing, drawing |
+| `src/renderer/model.js` | The notebook model, templates, sanitising and save building |
+| `src/renderer/app/` | The app itself, in numbered modules loaded in order |
+| `scripts/` | Tests, the colour-contrast audit, icon and installer artwork generators |
+
+## The `.ntb` format
+
+A zip archive containing `notebook.json` (sections, page order, cover, settings), `pages/<id>.json` (each page's text and ink) and `assets/<hash>.<ext>` (images). Ink strokes are stored as points in A4 sheet units (794 × 1122 per sheet).
+
+---
+
+Copyright © 2026 Jotter.

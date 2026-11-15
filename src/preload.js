@@ -1,0 +1,40 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+const invoke = (channel) => (...args) => ipcRenderer.invoke(channel, ...args);
+const on = (channel) => (fn) => ipcRenderer.on(channel, (_e, ...args) => fn(...args));
+
+contextBridge.exposeInMainWorld('jotter', {
+  ready: invoke('app:ready'),
+  setState: (state) => ipcRenderer.send('app:state', state),
+  closeConfirmed: () => ipcRenderer.send('app:close-confirmed'),
+  setFullscreen: (on) => ipcRenderer.send('window:fullscreen', on),
+  newWindow: (path) => ipcRenderer.send('window:new', path || null),
+  setOverlay: (colors) => ipcRenderer.send('window:overlay', colors),
+  setSettings: invoke('settings:set'),
+  listRecents: invoke('recents:list'),
+  touchRecent: invoke('recents:touch'),
+  removeRecent: invoke('recents:remove'),
+  pinRecent: invoke('recents:pin'),
+  clearDraft: invoke('draft:clear'),
+  libraryInfo: invoke('library:info'),
+  libraryNew: invoke('library:new'),
+  libraryChoose: invoke('library:choose'),
+  libraryOpen: invoke('library:open'),
+  trashNotebook: invoke('notebook:trash'),
+  openNotebook: invoke('dialog:open'),
+  readNotebook: invoke('notebook:read'),
+  renameNotebook: invoke('notebook:rename'),
+  saveNotebook: invoke('notebook:save'),
+  listHistory: invoke('history:list'),
+  readHistory: invoke('history:read'),
+  exportPdf: invoke('export:pdf'),
+  exportPng: invoke('export:png'),
+  exportText: invoke('export:text'),
+  print: invoke('export:print'),
+  openExternal: invoke('shell:open'),
+  openLicences: invoke('app:licences'),
+  onCommand: on('command'),
+  onOpenFile: on('open-file'),
+  onSettings: on('settings'),
+  onFullscreen: on('fullscreen'),
+});

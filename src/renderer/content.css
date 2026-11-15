@@ -1,0 +1,86 @@
+/* Page content: typography, paper styles, lists, tables, text boxes. Shared by the editor, the
+   thumbnails, printing and PDF export, so all of them look the same. */
+.note-content {
+  position: relative;
+  box-sizing: border-box;
+  padding: 56px 64px;
+  font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  color: #1c1c1c;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+.note-content h1 { font-size: 30px; line-height: 1.25; font-weight: 600; margin: 0 0 10px; }
+.note-content h2 { font-size: 22px; line-height: 1.3; font-weight: 600; margin: 14px 0 6px; }
+.note-content h3 { font-size: 18px; line-height: 1.35; font-weight: 600; margin: 12px 0 4px; }
+.note-content p, .note-content div { margin: 0; }
+.note-content ul, .note-content ol { margin: 4px 0; padding-left: 28px; }
+.note-content img { max-width: 100%; height: auto; border-radius: 2px; }
+.note-content a { color: #2b4a8b; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Checklists: the box is drawn before each item and ticked with the class "done". */
+.note-content ul.checklist { list-style: none; padding-left: 2px; }
+.note-content ul.checklist > li { position: relative; padding-left: 28px; }
+.note-content ul.checklist > li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.3em;
+  width: 15px;
+  height: 15px;
+  box-sizing: border-box;
+  border: 1.5px solid #7a6b5e;
+  border-radius: 4px;
+}
+.note-content ul.checklist > li.done { color: #66615b; text-decoration: line-through; }
+.note-content ul.checklist > li.done::before {
+  border-color: #3f7d3a;
+  background: #3f7d3a url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-7' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px no-repeat;
+}
+
+/* Tables */
+.note-content table { border-collapse: collapse; width: 100%; margin: 8px 0; table-layout: fixed; }
+.note-content td, .note-content th { border: 1px solid rgba(60, 40, 25, 0.22); padding: 6px 10px; vertical-align: top; min-width: 40px; }
+.note-content table.cornell td:first-child { width: 28%; }
+.note-content table.planner td:first-child { width: 22%; }
+.note-content table.planner td { height: 64px; }
+
+/* Text boxes placed anywhere on the page */
+.note-content .tbox { position: absolute; min-width: 80px; max-width: 760px; padding: 4px 6px; }
+.note-content .tbox-body { outline: none; min-height: 1.55em; }
+
+/* Lined papers: text rows snap to the pattern so typing sits on the lines. */
+.note-content[data-paper='ruled'] { line-height: 32px; }
+.note-content:is([data-paper='grid'], [data-paper='dotted'], [data-paper='kolam']) { line-height: 24px; }
+/* The patterns also go on .paper-bg, a backdrop wider than the text column; --ox is the column's left edge in it. */
+:is(.note-content, .paper-bg)[data-paper='ruled'] {
+  background-image: linear-gradient(to bottom, transparent 31px, rgba(60, 90, 150, 0.26) 31px);
+  background-size: 100% 32px;
+  background-position: 0 19px;
+}
+:is(.note-content, .paper-bg)[data-paper='grid'] {
+  background-image:
+    linear-gradient(to bottom, transparent 23px, rgba(60, 90, 150, 0.2) 23px),
+    linear-gradient(to right, transparent 23px, rgba(60, 90, 150, 0.2) 23px);
+  background-size: 24px 24px;
+  background-position: calc(16px + var(--ox, 0px)) 6px;
+}
+:is(.note-content, .paper-bg)[data-paper='dotted'] {
+  background-image: radial-gradient(circle, rgba(50, 60, 80, 0.42) 1px, transparent 1.4px);
+  background-size: 24px 24px;
+  background-position: calc(4px + var(--ox, 0px)) 17px;
+}
+/* Kolam paper: the offset dot grid that kolam is drawn on. */
+:is(.note-content, .paper-bg)[data-paper='kolam'] {
+  background-image:
+    radial-gradient(circle, rgba(176, 70, 43, 0.5) 1.1px, transparent 1.5px),
+    radial-gradient(circle, rgba(176, 70, 43, 0.5) 1.1px, transparent 1.5px);
+  background-size: 24px 24px;
+  background-position: calc(4px + var(--ox, 0px)) 17px, calc(16px + var(--ox, 0px)) 29px;
+}
+.note-content:is([data-paper='ruled'], [data-paper='grid'], [data-paper='dotted'], [data-paper='kolam']) :is(h1, h2, h3, ul, ol, table) { margin: 0; }
+.note-content[data-paper='ruled'] h1 { line-height: 64px; }
+.note-content[data-paper='ruled'] :is(h2, h3) { line-height: 32px; }
+.note-content:is([data-paper='grid'], [data-paper='dotted'], [data-paper='kolam']) :is(h1, h2) { line-height: 48px; }
+.note-content:is([data-paper='grid'], [data-paper='dotted'], [data-paper='kolam']) h3 { line-height: 24px; }
