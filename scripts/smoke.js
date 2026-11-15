@@ -422,10 +422,21 @@ app.whenReady().then(async () => {
   check('rename updates the title', win.getTitle() === 'Renamed book — Jotter', win.getTitle());
 
   // ----- Exports -----
-  await js(`document.querySelector('#paper-colors [data-value="sepia"]').click(); run('export-pdf'); 0`);
+  // A notebook with A4 pages and an infinite page: the PDF can leave the infinite page out.
+  await js(`document.querySelector('#paper-colors [data-value="sepia"]').click(); addPage(); document.querySelector('#page-mode [data-value="infinite"]').click(); 0`);
+  await sleep(150);
+  const waitPdf = async () => { for (let i = 0; i < 200 && !fs.existsSync(files.pdf); i++) await sleep(100); await sleep(500); return fs.existsSync(files.pdf); };
+  const pdfSheets = () => (fs.readFileSync(files.pdf, 'latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
+  if (fs.existsSync(files.pdf)) fs.unlinkSync(files.pdf);
+  await js(`run('export-pdf'); 0`);
+  await answer('A4 pages only');
   await answer('Paper colour');
-  check('pdf written', (await (async () => { for (let i = 0; i < 200 && !fs.existsSync(files.pdf); i++) await sleep(100); return fs.existsSync(files.pdf); })()));
-  await sleep(500);
+  check('pdf asks about infinite pages and can leave them out', (await waitPdf()) && pdfSheets() === (await js(`exportPayload(Model.allPages(state.nb).filter((p) => p.mode !== 'infinite')).reduce((n, p) => n + p.sheets, 0)`)));
+  fs.unlinkSync(files.pdf);
+  await js(`run('export-pdf'); 0`);
+  await answer('Include infinite pages');
+  await answer('Paper colour');
+  check('pdf written', await waitPdf());
   const expected = await js(`exportPayload(Model.allPages(state.nb)).reduce((n, p) => n + p.sheets, 0)`);
   const pdfPages = (fs.readFileSync(files.pdf, 'latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
   check('pdf has one page per sheet', pdfPages === expected, `(${pdfPages} of ${expected})`);

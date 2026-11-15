@@ -39,8 +39,31 @@ function exportPayload(list) {
   });
 }
 
+/*
+  Which pages go into a PDF or a print-out. When a notebook mixes A4 pages and infinite pages, you choose
+  whether the infinite ones come along (trimmed to their content and cut into A4 sheets) or only the
+  proper A4 pages are exported. Returns null when cancelled.
+*/
+async function pagesToExport() {
+  const all = Model.allPages(state.nb);
+  const infinite = all.filter((p) => p.mode === 'infinite').length;
+  const paged = all.length - infinite;
+  if (!infinite || !paged) return all;
+  const r = await ask({
+    message: `Include the ${plural(infinite, 'infinite page')}?`,
+    detail: `This notebook has ${plural(paged, 'A4 page')} and ${plural(infinite, 'infinite page')}. Infinite pages are trimmed to what is on them and cut into A4 sheets.`,
+    buttons: ['A4 pages only', 'Include infinite pages', 'Cancel'],
+    cancelId: 2,
+  });
+  if (r === 0) return all.filter((p) => p.mode !== 'infinite');
+  if (r === 1) return all;
+  return null;
+}
+
 async function exportPdf() {
   commitEditor();
+  const list = await pagesToExport();
+  if (!list) return;
   let background = Model.PAPER_COLORS.white;
   if (state.nb.paperColor !== 'white') {
     const r = await ask({
@@ -52,7 +75,7 @@ async function exportPdf() {
     if (r === 1) background = Model.PAPER_COLORS[state.nb.paperColor];
   }
   flash('Exporting PDF…');
-  const res = await api.exportPdf({ pages: exportPayload(Model.allPages(state.nb)), suggestedName: notebookName(), background });
+  const res = await api.exportPdf({ pages: exportPayload(list), suggestedName: notebookName(), background });
   if (!res) return flash('');
   if (res.error) return showError(res.error);
   flash(`PDF exported to ${res.path}`);
@@ -89,8 +112,10 @@ async function exportMarkdown() {
 
 async function printNotebook() {
   commitEditor();
+  const list = await pagesToExport();
+  if (!list) return;
   flash('Preparing to print…');
-  const res = await api.print({ pages: exportPayload(Model.allPages(state.nb)), background: Model.PAPER_COLORS.white });
+  const res = await api.print({ pages: exportPayload(list), background: Model.PAPER_COLORS.white });
   flash('');
   if (res && res.error) await showError(res.error);
 }

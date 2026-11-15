@@ -39,7 +39,7 @@ Notebooks save themselves a moment after every change. Every ten minutes of work
 
 ## Export and print
 
-**Export as PDF** (Ctrl+E) asks whether to export the page, the section or the whole notebook, with or without the paper lines. Settings also offers a page image (PNG), Markdown, print and *Save a copy*.
+**Export as PDF** (Ctrl+E) exports the whole notebook, one PDF page per A4 sheet, with the ink as sharp vector lines. If the notebook mixes A4 and infinite pages it asks whether to include the infinite ones (they are trimmed to what is on them and cut into A4 sheets) or export only the A4 pages; print asks the same. With a coloured paper it also asks whether the PDF background should be white or the paper colour. Settings also offers a page image (PNG), Markdown, print and *Save a copy*.
 
 ## View
 
