@@ -227,8 +227,8 @@ select {
 body[data-view='home'] #dragbar, body.focus #dragbar { display: block; }
 
 /* ---------- Tool rail (right edge) ----------
-   The tools stand in a column at the right edge and never move. The chosen tool's options sit in a
-   second column beside them; the rail is anchored to the right, so options of any size grow leftwards. */
+   Two columns: the chosen tool's options, then the tools. The tools never move; the rail is anchored to
+   the right, so the options column grows leftwards. The options column folds away with the top button. */
 #dock {
   position: fixed;
   right: 20px; /* clear of the page scrollbar */
@@ -236,52 +236,57 @@ body[data-view='home'] #dragbar, body.focus #dragbar { display: block; }
   z-index: 8;
   transform: translateY(-50%);
   display: flex;
-  align-items: center;
-  max-height: calc(100vh - var(--bar) - 112px);
-  padding: var(--s1);
+  align-items: stretch;
+  max-height: calc(100vh - var(--bar) - var(--s6));
+  padding: var(--s2) var(--s1);
   border-radius: var(--r-xl);
   background: var(--raised);
   box-shadow: var(--shadow);
   transition: opacity 0.25s var(--ease);
 }
-body.focus #dock { top: 50%; max-height: calc(100vh - 112px); }
+body.focus #dock { top: 50%; max-height: calc(100vh - var(--s6)); }
 /* While you draw, the rail steps back so it never covers your line. */
 body.inking #dock { opacity: 0.18; pointer-events: none; }
-.dock-main { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
-.dock-sep { width: 20px; height: 1px; margin: var(--s1) 0; background: var(--line); }
+.dock-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s1); flex: none; }
+.dock-sep { width: 24px; height: 1px; margin: var(--s1) 0; background: var(--line); flex: none; }
 .dock-main .btn { color: var(--muted); }
 .dock-main .btn:hover { color: var(--text); }
+#btn-rail .ic { transform: rotate(-90deg); transition: transform 0.2s var(--ease); }
+body.rail-collapsed #btn-rail .ic { transform: rotate(90deg); }
 
-.tools { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tools { display: flex; flex-direction: column; align-items: center; gap: var(--s1); }
 .tool { position: relative; width: 40px !important; height: 40px; border-radius: var(--r-lg); color: var(--muted); }
 .tool .ic { width: 22px; height: 22px; }
 .tool:hover { color: var(--text); }
 .tool.active { background: var(--accent-soft); color: var(--accent); }
 .tool.active::after { content: ''; position: absolute; left: 3px; top: 50%; width: 4px; height: 4px; margin-top: -2px; background: currentColor; transform: rotate(45deg); }
 
-/* Options column: every group is a two-column grid of 32 px cells, centred, 12 px apart. */
+/* Options column: a single 32 px column, groups 12 px apart, centred, scrolling if the window is short. */
 .opts {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s3);
-  align-self: stretch; width: 88px; max-height: 100%; padding: var(--s2) var(--s1);
-  margin-right: var(--s1); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: var(--s3);
+  width: 52px; padding: var(--s1) 0; margin-right: var(--s1); border-right: 1px solid var(--line);
   overflow-x: hidden; overflow-y: auto; scrollbar-width: none;
 }
+.opts::before, .opts::after { content: ''; margin: auto; }
 .opts::-webkit-scrollbar { display: none; }
-.opt { display: grid; grid-template-columns: repeat(2, 32px); justify-items: center; align-items: center; gap: var(--s1); flex: none; }
+body.rail-collapsed .opts, body[data-tool='select'] .opts { display: none; }
+.opt { display: flex; flex-direction: column; align-items: center; gap: var(--s1); flex: none; }
 .opt .btn.icon { width: 32px; height: 32px; }
-.row-hint { grid-column: 1 / -1; width: 76px; font-size: var(--t-sm); line-height: 1.35; color: var(--muted); text-align: center; white-space: normal; }
-#text-options select { grid-column: 1 / -1; width: 72px; height: 30px; padding: 0 2px 0 var(--s2); background: transparent; font-size: var(--t-sm); font-weight: 600; }
-#text-options select:hover { background: var(--hover); }
+#select-hint { display: none !important; }
+#text-options select {
+  appearance: none; width: 40px; height: 30px; padding: 0; text-align: center; text-align-last: center;
+  background: var(--hover); font-size: var(--t-sm); font-weight: 700;
+}
+#text-options select:hover { background: var(--press); }
 #insert-options { padding-top: var(--s3); border-top: 1px solid var(--line); }
-#color-options > * { grid-column: 1 / -1; }
-#swatches { display: grid !important; grid-template-columns: repeat(2, 24px); gap: 6px; justify-items: center; }
+#color-options { gap: 6px; }
+#swatches { display: flex !important; flex-direction: column; align-items: center; gap: 6px; }
 body[data-tool='text'] #swatches { display: none !important; }
-#shape-kind { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, 32px); gap: 2px; padding: 2px; }
+#shape-kind { display: flex; flex-direction: column; gap: 2px; padding: 2px; }
 #shape-kind button { min-width: 0; width: 32px; height: 30px; padding: 0; }
-#eraser-mode-row { grid-template-columns: 76px; }
-#eraser-mode { display: flex; flex-direction: column; width: 76px; }
-#eraser-mode button { width: 100%; padding: 0 var(--s1); font-size: var(--t-sm); }
-#eraser-mode-row .btn.small { width: 76px; }
+#eraser-mode { display: flex; flex-direction: column; width: 46px; }
+#eraser-mode button { width: 100%; min-width: 0; padding: 0; font-size: var(--t-xs); }
+#eraser-mode-row .btn.small { width: 46px; padding: 0; font-size: var(--t-xs); }
 
 body[data-tool='text'] :is(#size-options, #shape-options, #eraser-mode-row, #select-hint),
 body[data-tool='pen'] :is(#text-options, #insert-options, #shape-options, #eraser-mode-row, #select-hint),
@@ -290,15 +295,14 @@ body[data-tool='shape'] :is(#text-options, #insert-options, #eraser-mode-row, #s
 body[data-tool='eraser'] :is(#text-options, #insert-options, #shape-options, #color-options, #select-hint),
 body[data-tool='select'] :is(#text-options, #insert-options, #shape-options, #size-options, #eraser-mode-row, #color-options) { display: none; }
 
-#size-options { grid-template-columns: 76px; }
 .size-ui { display: flex; flex-direction: column; align-items: center; gap: var(--s2); }
 .size-fine { display: flex; flex-direction: column; align-items: center; gap: var(--s1); }
 .size-preview { width: 32px; height: 32px; flex: none; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1px var(--swatch-ring); }
 #size-dot { border-radius: 50%; background: #1f1b18; }
 body[data-tool='eraser'] #size-dot { background: transparent; box-shadow: 0 0 0 1.5px #777; }
-.size-presets { display: grid; grid-template-columns: repeat(2, 28px); gap: 2px; justify-items: center; }
+.size-presets { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .size-presets .preset {
-  width: 28px; height: 26px; padding: 0; border: 0; border-radius: var(--r-sm);
+  width: 32px; height: 24px; padding: 0; border: 0; border-radius: var(--r-sm);
   background: transparent; cursor: pointer; display: grid; place-items: center;
 }
 .size-presets .preset:hover { background: var(--hover); }
@@ -381,7 +385,7 @@ body[data-tool='eraser'] .size-presets .preset[aria-pressed='true'] i { box-shad
 
 /* ---------- Layout ---------- */
 #body { flex: 1; display: flex; min-height: 0; }
-body[data-view='home'] :is(#topbar, #sidebar, #workspace, #zoom-ctl, #dock) { display: none; }
+body[data-view='home'] :is(#topbar, #sidebar, #page-area, #zoom-ctl, #dock) { display: none; }
 body[data-view='editor'] #home { display: none; }
 body.no-sidebar #sidebar { display: none; }
 
@@ -452,9 +456,14 @@ body.no-sidebar #sidebar { display: none; }
 .side-foot .btn { color: var(--muted); }
 
 /* ---------- Page ---------- */
-#workspace { flex: 1; overflow: auto; min-width: 0; padding: 0 168px var(--s7) var(--s6); }
-#sheet-wrap { width: 794px; margin: 0 auto; }
-#title-row { display: flex; align-items: center; gap: var(--s3); height: 64px; }
+/* Equal room on both sides, so the page is always centred; the room matches the tool rail's width. */
+:root { --rail-room: 140px; }
+body.rail-collapsed { --rail-room: 84px; }
+#workspace { flex: 1; overflow: auto; min-width: 0; min-height: 0; padding: 2px var(--rail-room) var(--s7); }
+#sheet-wrap { width: 794px; margin: 0; } /* placed by centrePage() */
+/* The page area: the title row stays fixed while the page below scrolls and zooms. */
+#page-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#title-row { display: flex; align-items: center; gap: var(--s3); flex: none; height: 64px; padding: 0 var(--rail-room); }
 /* Page type and lines: plain words beside the title; their track appears when you point at the row. */
 .page-opts { display: flex; align-items: center; gap: var(--s2); flex: none; }
 .page-opts .seg { background: transparent; transition: background-color 0.15s; }
@@ -577,27 +586,18 @@ body[data-mode='infinite'] #extend { display: none; }
 /* Infinite pages: the paper fills the whole workspace; text stays in a readable centred column. */
 .paper-bg { position: absolute; inset: 0; pointer-events: none; display: none; }
 body[data-mode='infinite'] .paper-bg { display: block; }
-/* The paper stops short of the tool rail, so the rail always sits on the desk, never on your page. */
-body[data-mode='infinite'] #workspace { padding: 0 168px 0 0; }
+body[data-mode='infinite'] #workspace { padding: 0; }
 body.focus[data-mode='infinite'] #workspace { padding-top: 0; }
 body[data-mode='infinite'] #sheet-wrap { width: auto; margin: 0; }
-body[data-mode='infinite'] #title-row { margin: 0; padding: 0 var(--s6); }
 body[data-mode='infinite'] #sheet { width: auto; min-width: 794px; box-shadow: none; border-radius: 0; }
-body[data-mode='infinite'] #editor { width: 794px; margin: 0 auto; background-image: none; }
+body[data-mode='infinite'] #editor { width: 794px; margin: 0; background-image: none; } /* placed by centrePage() */
 
 #measure { position: absolute; left: -10000px; top: 0; width: 794px; visibility: hidden; pointer-events: none; }
 
 /* Zoom and messages */
-#zoom-ctl {
-  position: fixed; right: 20px; bottom: var(--s4); z-index: 8;
-  display: flex; align-items: center; gap: 2px; padding: 2px;
-  background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow);
-  transition: opacity 0.25s var(--ease);
-}
-body.inking #zoom-ctl { opacity: 0.18; pointer-events: none; }
-#zoom-ctl .btn { color: var(--muted); }
-#zoom-ctl .btn:hover { color: var(--text); }
-#zoom-value { min-width: 48px; font-variant-numeric: tabular-nums; }
+#zoom-ctl { display: flex; align-items: center; margin-right: var(--s2); }
+#zoom-value { min-width: 48px; color: var(--muted); font-variant-numeric: tabular-nums; }
+#zoom-value:hover { color: var(--text); }
 #status-msg {
   position: fixed; left: 50%; top: calc(var(--bar) + var(--s2)); z-index: 50; transform: translateX(-50%);
   max-width: min(640px, 80vw); padding: var(--s2) var(--s4);
@@ -607,12 +607,11 @@ body.inking #zoom-ctl { opacity: 0.18; pointer-events: none; }
   animation: rise 0.18s var(--ease);
 }
 #status-msg:empty { display: none; }
-body[data-view='home'] #status-msg { top: auto; bottom: var(--s5); }
+#status-msg { top: auto; bottom: var(--s5); } /* at the bottom, clear of the title row */
 
 /* ---------- Focus mode: just the page and the dock ---------- */
 body.focus :is(#topbar, #sidebar, #zoom-ctl) { display: none; }
 body.focus .btn.focus-only { display: inline-flex; }
-body.focus #workspace { padding-top: var(--s6); }
 
 /* Narrower windows */
 @media (max-width: 1280px) {

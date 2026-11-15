@@ -118,6 +118,8 @@ app.whenReady().then(async () => {
     if (/Error/.test(e.message)) console.log('RENDERER:', e.message);
   });
   const js = (code) => wc.executeJavaScript(code, true);
+  // Measure final colours, not frames of a fade-in.
+  await wc.insertCSS('*, *::before, *::after { animation: none !important; transition: none !important; }');
   await js(`window.__audit = ${AUDIT}; 0`);
 
   // A notebook with something in every part of the screen.

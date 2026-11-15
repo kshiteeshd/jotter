@@ -135,3 +135,21 @@ function onToolClick(tool) {
 }
 document.querySelectorAll('.tool').forEach((b) => b.addEventListener('click', () => onToolClick(b.dataset.tool)));
 
+
+// The options column of the tool rail can be folded away, leaving just the tools; the page then sits in
+// the middle of the window. Remembered on this computer.
+function setRailCollapsed(on) {
+  document.body.classList.toggle('rail-collapsed', on);
+  const b = $('btn-rail');
+  const label = on ? 'Show tool options' : 'Hide tool options';
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  b.setAttribute('aria-expanded', String(!on));
+  try {
+    localStorage.setItem('railCollapsed', on ? '1' : '');
+  } catch {}
+  onViewportChange();
+}
+try {
+  if (localStorage.getItem('railCollapsed')) setRailCollapsed(true);
+} catch {}

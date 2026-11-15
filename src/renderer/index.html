@@ -71,6 +71,11 @@
     </div>
     <div class="tb-right">
       <span id="save-state" data-state="saved" title="All changes saved"><i aria-hidden="true"></i><span></span></span>
+      <div id="zoom-ctl" role="group" aria-label="Zoom">
+        <button class="btn icon small" data-cmd="zoom-out" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
+        <button class="btn small" id="zoom-value" data-cmd="zoom-reset" title="Actual size (Ctrl+0)">100%</button>
+        <button class="btn icon small" data-cmd="zoom-in" title="Zoom in (Ctrl+=)" aria-label="Zoom in">+</button>
+      </div>
       <button class="btn icon" id="btn-search" data-cmd="find" title="Search this notebook (Ctrl+F)" aria-label="Search" aria-haspopup="dialog" aria-expanded="false"><svg class="ic"><use href="#i-search"/></svg></button>
       <button class="btn icon" data-cmd="export-pdf" title="Export as PDF (Ctrl+E)" aria-label="Export as PDF"><svg class="ic"><use href="#i-download"/></svg></button>
       <button class="btn icon" id="btn-view" data-cmd="settings" title="Settings, export and more (Ctrl+,)" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
@@ -96,40 +101,43 @@
       </div>
     </aside>
 
-    <main id="workspace">
-      <div id="sheet-wrap">
-        <div id="title-row">
-          <input id="page-title" type="text" maxlength="120" placeholder="Page title" spellcheck="false" aria-label="Page title">
-          <div class="page-opts">
-            <div class="seg small" id="page-mode" role="radiogroup" aria-label="Page type">
-              <button data-value="paged" role="radio" title="A4 sheets with page breaks">Paged</button>
-              <button data-value="infinite" role="radio" title="One continuous page that fills the window and keeps growing">Infinite</button>
-            </div>
-            <div class="seg small" id="paper-style" role="radiogroup" aria-label="Lines">
-              <button data-value="plain" role="radio" title="Plain paper">Plain</button>
-              <button data-value="ruled" role="radio" title="Ruled lines">Ruled</button>
-              <button data-value="grid" role="radio" title="Squared grid">Grid</button>
-              <button data-value="dotted" role="radio" title="Dot grid">Dots</button>
-              <button data-value="kolam" role="radio" title="Kolam dot grid">Kolam</button>
-            </div>
+    <!-- The page area: a fixed title row above the scrolling, zoomable page. -->
+    <div id="page-area">
+      <div id="title-row">
+        <input id="page-title" type="text" maxlength="120" placeholder="Page title" spellcheck="false" aria-label="Page title">
+        <div class="page-opts">
+          <div class="seg small" id="page-mode" role="radiogroup" aria-label="Page type">
+            <button data-value="paged" role="radio" title="A4 sheets with page breaks">Paged</button>
+            <button data-value="infinite" role="radio" title="One continuous page that fills the window and keeps growing">Infinite</button>
+          </div>
+          <div class="seg small" id="paper-style" role="radiogroup" aria-label="Lines">
+            <button data-value="plain" role="radio" title="Plain paper">Plain</button>
+            <button data-value="ruled" role="radio" title="Ruled lines">Ruled</button>
+            <button data-value="grid" role="radio" title="Squared grid">Grid</button>
+            <button data-value="dotted" role="radio" title="Dot grid">Dots</button>
+            <button data-value="kolam" role="radio" title="Kolam dot grid">Kolam</button>
           </div>
         </div>
-        <div id="sheet">
-          <div id="paper-bg" class="paper-bg" data-paper="plain"></div>
-          <div id="editor" class="note-content" data-paper="plain" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Page text" data-placeholder="Start typing, or pick the pen to write…"></div>
-          <div id="ink-layer">
-            <svg id="live" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="live-group"></g><path id="lasso-path" fill="none"/></svg>
-          </div>
-          <div id="breaks"></div>
-          <div id="sel" hidden><span class="sel-handle" title="Drag to resize"></span></div>
-          <div id="tbox-handle" hidden>
-            <button class="grip" title="Drag to move" aria-label="Move text box"><svg class="ic"><use href="#i-grip"/></svg></button>
-            <button class="del" title="Delete text box" aria-label="Delete text box"><svg class="ic"><use href="#i-close"/></svg></button>
-          </div>
-        </div>
-        <button id="extend" data-cmd="extend-page" title="Add another A4 sheet to the end of this page"><svg class="ic"><use href="#i-plus"/></svg>Add a sheet</button>
       </div>
-    </main>
+      <main id="workspace">
+        <div id="sheet-wrap">
+          <div id="sheet">
+            <div id="paper-bg" class="paper-bg" data-paper="plain"></div>
+            <div id="editor" class="note-content" data-paper="plain" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Page text" data-placeholder="Start typing, or pick the pen to write…"></div>
+            <div id="ink-layer">
+              <svg id="live" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><g id="live-group"></g><path id="lasso-path" fill="none"/></svg>
+            </div>
+            <div id="breaks"></div>
+            <div id="sel" hidden><span class="sel-handle" title="Drag to resize"></span></div>
+            <div id="tbox-handle" hidden>
+              <button class="grip" title="Drag to move" aria-label="Move text box"><svg class="ic"><use href="#i-grip"/></svg></button>
+              <button class="del" title="Delete text box" aria-label="Delete text box"><svg class="ic"><use href="#i-close"/></svg></button>
+            </div>
+          </div>
+          <button id="extend" data-cmd="extend-page" title="Add another A4 sheet to the end of this page"><svg class="ic"><use href="#i-plus"/></svg>Add a sheet</button>
+        </div>
+      </main>
+    </div>
 
     <main id="home">
       <div class="home-inner">
@@ -184,15 +192,15 @@
   </div>
 
 
-  <!-- The tool rail stands at the right edge. The tools never move; the chosen tool's options sit in a column beside them. -->
+  <!-- The tool rail stands at the right edge: the chosen tool's options in one column, the tools in the other. The tools never move; the options column can be collapsed. -->
   <div id="dock" role="toolbar" aria-label="Tools">
     <div class="opts" id="tool-options" aria-label="Tool options">
       <div class="opt" id="text-options">
         <select id="block-style" title="Text style" aria-label="Text style">
-          <option value="div">Normal</option>
-          <option value="h1">Title</option>
-          <option value="h2">Heading</option>
-          <option value="h3">Subheading</option>
+          <option value="div" title="Normal text">Aa</option>
+          <option value="h1" title="Title">H1</option>
+          <option value="h2" title="Heading">H2</option>
+          <option value="h3" title="Subheading">H3</option>
         </select>
         <button class="btn icon fmt" data-fmt="bold" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
         <button class="btn icon fmt" data-fmt="italic" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
@@ -233,16 +241,18 @@
       </div>
       <div class="opt" id="eraser-mode-row">
         <div class="seg" id="eraser-mode" role="radiogroup" aria-label="Eraser type">
-          <button data-value="rub" role="radio" title="Rub out only what you touch">Rub out</button>
-          <button data-value="stroke" role="radio" title="Remove a whole stroke with one touch">Whole stroke</button>
+          <button data-value="rub" role="radio" title="Rub out only what you touch">Rub</button>
+          <button data-value="stroke" role="radio" title="Remove a whole stroke with one touch">Whole</button>
         </div>
-        <button class="btn small" data-cmd="clear-ink" title="Remove all ink on this page">Clear page</button>
+        <button class="btn small" data-cmd="clear-ink" title="Remove all ink on this page">Clear</button>
       </div>
       <div class="opt" id="select-hint">
         <span class="row-hint">Draw a loop around ink to select it</span>
       </div>
     </div>
     <div class="dock-main">
+      <button class="btn icon" id="btn-rail" data-cmd="toggle-rail" title="Hide tool options" aria-label="Hide tool options" aria-expanded="true"><svg class="ic"><use href="#i-chevron"/></svg></button>
+      <span class="dock-sep" aria-hidden="true"></span>
     <div class="tools" id="tools" role="radiogroup" aria-label="Tool">
       <button class="btn icon tool" data-tool="text" role="radio" title="Type (T)" aria-label="Type"><svg class="ic"><use href="#i-type"/></svg></button>
       <button class="btn icon tool" data-tool="pen" role="radio" title="Pen (P)" aria-label="Pen"><svg class="ic"><use href="#i-pen"/></svg></button>
@@ -259,11 +269,6 @@
   </div>
 
   <span id="status-msg" role="status" aria-live="polite"></span>
-  <div id="zoom-ctl">
-    <button class="btn icon small" data-cmd="zoom-out" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
-    <button class="btn small" id="zoom-value" data-cmd="zoom-reset" title="Actual size (Ctrl+0)">100%</button>
-    <button class="btn icon small" data-cmd="zoom-in" title="Zoom in (Ctrl+=)" aria-label="Zoom in">+</button>
-  </div>
 
   <div id="page-menu" class="popover menu" role="menu" aria-label="Page" hidden>
     <div class="menu-title" id="page-menu-title"></div>

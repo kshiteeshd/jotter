@@ -70,6 +70,7 @@ const commands = {
   'zoom-out': () => stepZoom(-1),
   'zoom-reset': () => setZoom(1),
   'toggle-sidebar': () => applySettings({ sidebar: !state.settings.sidebar }),
+  'toggle-rail': () => setRailCollapsed(!document.body.classList.contains('rail-collapsed')),
   'toggle-focus': () => setFocusMode(!document.body.classList.contains('focus')),
   'toggle-fullscreen': () => api.setFullscreen(!state.fullscreen),
   'toggle-view-panel': () => openSettings(),

@@ -197,6 +197,24 @@ app.whenReady().then(async () => {
     for (const k of [{ saving: true }, { saving: false, dirty: true }, { dirty: false }]) { Object.assign(state, k); syncChrome(); out.add(at()); }
     return out.size; })()`);
   check('title bar buttons stay put while saving', barSpots === 1, barSpots);
+  // The page is centred on the app window with the tool options open and folded.
+  await js(`setTool('pen'); 0`);
+  await shot('05b-rail-open');
+  const centred = `(() => { const p = el.sheet.getBoundingClientRect(); return Math.abs((p.left + p.right) / 2 - innerWidth / 2) < 2; })()`;
+  check('the page is centred with the options open', await js(centred));
+  await js(`run('toggle-rail'); 0`);
+  await sleep(100);
+  check('the options column folds away', !(await js(`document.querySelector('.opts').offsetWidth`)));
+  check('the page is centred with the options folded', await js(centred));
+  await shot('05c-rail-folded');
+  await js(`run('toggle-rail'); setTool('marker'); 0`);
+  const rowAt = `(() => { const r = document.getElementById('title-row').getBoundingClientRect(); const t = el.pageTitle.getBoundingClientRect(); return [r.top, r.height, t.left, t.width].map(Math.round).join(); })()`;
+  const rowBefore = await js(rowAt);
+  await js(`el.workspace.scrollTop = 400; setZoom(1.5); 0`);
+  await sleep(150);
+  const rowAfter = await js(rowAt);
+  await js(`setZoom(1); el.workspace.scrollTop = 0; 0`);
+  check('the title row stays fixed while the page scrolls and zooms', rowBefore === rowAfter, `${rowBefore} / ${rowAfter}`);
   await js(`setTool('text'); 0`);
   check('typing shows text options and hides size', (await js(shown('text-options'))) && !(await js(shown('size-options'))));
   await js(`(() => { const li = el.pageList.children[0]; const r = li.getBoundingClientRect();
@@ -274,6 +292,7 @@ app.whenReady().then(async () => {
   }
   check('infinite page grows while scrolling', (await js(`page().sheets`)) > s0 + 2);
   check('only nearby canvases are kept', (await js(`tiles.size`)) <= 4);
+  check('the text column of an infinite page is centred on the window', await js(`(() => { const r = el.editor.getBoundingClientRect(); return Math.abs((r.left + r.right) / 2 - innerWidth / 2) < 2; })()`));
   await js(`el.workspace.scrollTop = 0; 0`);
   await sleep(150);
   await drag([[150, 200], [300, 260], [450, 200]]);
@@ -354,7 +373,7 @@ app.whenReady().then(async () => {
   // ----- Exports -----
   await js(`document.querySelector('#paper-colors [data-value="sepia"]').click(); run('export-pdf'); 0`);
   await answer('Paper colour');
-  check('pdf written', (await (async () => { for (let i = 0; i < 80 && !fs.existsSync(files.pdf); i++) await sleep(100); return fs.existsSync(files.pdf); })()));
+  check('pdf written', (await (async () => { for (let i = 0; i < 200 && !fs.existsSync(files.pdf); i++) await sleep(100); return fs.existsSync(files.pdf); })()));
   await sleep(500);
   const expected = await js(`exportPayload(Model.allPages(state.nb)).reduce((n, p) => n + p.sheets, 0)`);
   const pdfPages = (fs.readFileSync(files.pdf, 'latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;

@@ -16,7 +16,45 @@ const viewTop = () => {
   return s ? Math.max(0, (el.workspace.getBoundingClientRect().top - s.rect.top) * s.k) : 0;
 };
 
+/*
+  The page is centred on the app window, not just on the area beside the sidebar, whether the tool
+  options are open or folded. It only moves aside when it would otherwise run under the sidebar or the
+  tool rail (a narrow window, or zoomed in). Paged: the workspace's left padding places the sheet.
+  Infinite: the paper fills the workspace and the text column is placed on it.
+*/
+const MIN_GAP = 16;
+function centrePage() {
+  if (!state.nb || state.view !== 'editor') return;
+  const ws = el.workspace;
+  const wr = ws.getBoundingClientRect();
+  const railRoom = parseFloat(getComputedStyle(document.body).getPropertyValue('--rail-room')) || 0;
+  const mid = window.innerWidth / 2 - wr.left; // window centre, measured from the workspace's left edge
+  if (page().mode === 'infinite') {
+    ws.style.paddingLeft = '';
+    const z = state.zoom;
+    const span = ws.clientWidth / z; // paper width in sheet units
+    const left = Math.max(0, Math.min(mid / z - W / 2, span - W - railRoom / z));
+    el.editor.style.marginLeft = `${Math.round(left)}px`;
+    placeTitleRow(mid, wr.width, railRoom);
+    return;
+  }
+  el.editor.style.marginLeft = '';
+  placeTitleRow(mid, wr.width, railRoom);
+  const sheetW = el.sheetWrap.getBoundingClientRect().width;
+  const left = Math.max(MIN_GAP, Math.min(mid - sheetW / 2, ws.clientWidth - railRoom - sheetW));
+  ws.style.paddingLeft = `${Math.round(left)}px`;
+}
+
+// The title row sits over the page's column at its normal size: it does not scroll or zoom with the page.
+function placeTitleRow(mid, width, railRoom) {
+  const row = el.pageTitle.parentElement;
+  const left = Math.max(MIN_GAP, Math.min(mid - W / 2, width - railRoom - W));
+  row.style.paddingLeft = `${Math.round(left)}px`;
+  row.style.paddingRight = `${Math.round(Math.max(railRoom, width - left - W))}px`;
+}
+
 function layoutSheets() {
+  centrePage();
   const p = page();
   const n = p.sheets;
   el.sheet.style.height = `${n * H}px`;
@@ -168,6 +206,7 @@ function onViewportChange() {
   requestAnimationFrame(() => {
     viewQueued = false;
     if (!state.nb || state.view !== 'editor') return;
+    centrePage();
     ensureRoom(viewBottom());
     updateTiles();
     if (selection) showSelection();

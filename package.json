@@ -1,6 +1,6 @@
 {
   "name": "jotter",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "A simple notebook app for typing and handwriting",
   "main": "src/main.js",
   "author": "Jotter",
