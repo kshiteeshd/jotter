@@ -236,6 +236,7 @@ app.whenReady().then(async () => {
         const tb = document.getElementById('topbar');
         if (tb.scrollWidth > tb.clientWidth + 1) out.push('title bar overflows');
         if (opts.right > area.right + 1) out.push('page switches cut off');
+        if (el.workspace.scrollWidth > el.workspace.clientWidth + 1) out.push('page scrolls sideways');
         const title = R(el.pageTitle);
         if (Math.abs(title.left + 8 - sheet.left) > 2) out.push('title not lined up with the page');
         if (sheet.width >= 480 && Math.abs(opts.right - sheet.right) > 2) out.push('page switches not lined up with the page');
@@ -247,6 +248,13 @@ app.whenReady().then(async () => {
       fs.writeFileSync(path.join(out, 'layout', `${w}x${h}-${side}.png`), (await wc.capturePage()).toPNG());
     }
   }
+  await js(`document.getElementById('dock-focus').click(); 0`);
+  await sleep(150);
+  check('the focus button in the tool bar turns focus mode on', (await js(`document.body.classList.contains('focus') && document.getElementById('dock-focus').getAttribute('aria-pressed')`)) === 'true');
+  fs.writeFileSync(path.join(out, 'layout', 'focus-from-bar.png'), (await wc.capturePage()).toPNG());
+  await js(`document.getElementById('dock-focus').click(); 0`);
+  await sleep(150);
+  check('and off again', (await js(`document.body.classList.contains('focus')`)) === false);
   check('tool bar and page line up at every size and edge', !layoutProblems.length, layoutProblems.join(' | '));
   win.setSize(860, 560);
   await js(`showHome(); 0`);
@@ -468,7 +476,7 @@ app.whenReady().then(async () => {
   // ----- Full screen and a second window -----
   await js(`run('back'); run('toggle-fullscreen'); 0`);
   await sleep(1200);
-  check('full screen on', win.isFullScreen() && (await js(`state.fullscreen`)));
+  check('full screen on', win.isFullScreen() && (await js(`state.fullscreen`)) && (await js(`document.getElementById('dock-fullscreen').getAttribute('aria-pressed')`)) === 'true');
   await js(`run('toggle-fullscreen'); 0`);
   await sleep(1200);
   check('full screen off', !win.isFullScreen());

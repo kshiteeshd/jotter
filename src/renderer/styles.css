@@ -125,7 +125,6 @@ body:not(.kbd) :focus-visible:not(input):not(select):not([contenteditable]) { ou
 .btn.small .ic { width: 16px; height: 16px; }
 .btn.danger:hover { color: var(--danger); }
 .btn[aria-pressed='true'], .btn[aria-expanded='true'] { background: var(--accent-soft); color: var(--accent); }
-.btn.focus-only { display: none; }
 
 .big {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--s2);
@@ -246,6 +245,19 @@ body.inking #dock { opacity: 0.18; pointer-events: none; }
 .dock-sep { width: 24px; height: 1px; margin: var(--s1) 0; background: var(--line); flex: none; }
 .dock-main .btn { color: var(--muted); }
 .dock-main .btn:hover { color: var(--text); }
+.dock-main .btn[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); }
+/* Similar tools sit together; a small gap sets each family apart (type · pen, marker, shapes · eraser, select). */
+.tool-gap { flex: none; width: 1px; height: 6px; }
+body:is([data-dock='top'], [data-dock='bottom']) .tool-gap { width: 6px; height: 1px; }
+/* Short windows: a slightly tighter bar, so it always fits. */
+@media (max-height: 760px) {
+  .dock-main { gap: 2px; }
+  .tool { width: 36px !important; height: 36px; }
+  .dock-main .btn.icon:not(.tool) { width: 30px; height: 30px; }
+  #btn-dock-grip { height: 20px; }
+  .dock-sep { margin: 2px 0; }
+  .tool-gap { height: 4px; }
+}
 #btn-dock-grip { height: 24px; cursor: grab; }
 #btn-dock-grip .ic { width: 18px; height: 18px; }
 body.dock-dragging, body.dock-dragging * { cursor: grabbing !important; }
@@ -506,6 +518,8 @@ body[data-dock='top'] { --pad-top: 112px; }
 body[data-dock='top'].rail-collapsed { --pad-top: 64px; }
 body[data-dock='bottom'] { --pad-bottom: 132px; }
 #workspace { flex: 1; overflow: auto; min-width: 0; min-height: 0; padding: var(--pad-top) var(--rail-room) var(--pad-bottom); }
+/* Docked on the left, the room for the bar is on the left (set by centrePage); the right needs only a margin. */
+body[data-dock='left'] #workspace { padding-right: var(--s4); }
 #sheet-wrap { width: 794px; margin: 0; } /* placed by centrePage() */
 /* The page area: the title row stays fixed while the page below scrolls and zooms. */
 #page-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -660,7 +674,6 @@ body[data-view='editor'][data-dock='bottom'].rail-collapsed #status-msg { bottom
 
 /* ---------- Focus mode: just the page and the dock ---------- */
 body.focus :is(#topbar, #sidebar, #zoom-ctl) { display: none; }
-body.focus .btn.focus-only { display: inline-flex; }
 
 /* Narrower windows */
 @media (max-width: 1280px) {

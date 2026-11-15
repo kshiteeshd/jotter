@@ -27,7 +27,9 @@ function setZoom(z, cx, cy) {
 */
 function fitZoom() {
   const room = parseFloat(getComputedStyle(document.body).getPropertyValue('--rail-room')) || 0;
-  const avail = el.workspace.clientWidth - 2 * Math.max(room, 16);
+  // Room for the bar on its own side, a small margin on the other.
+  const side = ['left', 'right'].includes(document.body.dataset.dock);
+  const avail = el.workspace.clientWidth - (side ? room + 16 : 2 * Math.max(room, 16));
   return Math.min(1, Math.max(0.5, Math.floor((avail / W) * 100) / 100));
 }
 function autoZoom() {
@@ -127,7 +129,7 @@ $('paper-colors').addEventListener('click', (e) => {
 
 function setFocusMode(on) {
   document.body.classList.toggle('focus', on);
-  $('btn-focus').setAttribute('aria-pressed', String(on));
+  for (const id of ['btn-focus', 'dock-focus']) $(id).setAttribute('aria-pressed', String(on));
   closePopovers();
   onViewportChange();
   sendOverlay();
@@ -135,7 +137,7 @@ function setFocusMode(on) {
 
 api.onFullscreen((on) => {
   state.fullscreen = on;
-  $('btn-fullscreen').setAttribute('aria-pressed', String(on));
+  for (const id of ['btn-fullscreen', 'dock-fullscreen']) $(id).setAttribute('aria-pressed', String(on));
   updateWco();
 });
 api.onSettings((s) => {

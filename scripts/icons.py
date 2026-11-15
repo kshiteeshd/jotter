@@ -97,7 +97,7 @@ html = re.sub(
 index.write_text(html, encoding='utf-8', newline='')
 
 # Every icon referenced by the app must exist.
-used = set(re.findall(r'#i-([\w-]+)', html)) | set(re.findall(r"'i-([\w-]+)'", (root / 'src' / 'renderer' / 'app.js').read_text(encoding='utf-8')))
+used = set(re.findall(r'#i-([\w-]+)', html)) | set(re.findall(r"'i-([\w-]+)'", ''.join(f.read_text(encoding='utf-8') for f in sorted((root / 'src' / 'renderer' / 'app').glob('*.js')))))
 missing = sorted(u for u in used if u not in ICONS and u != 'logo')
 print('missing:', missing or 'none')
 print('unused:', sorted(set(ICONS) - used) or 'none')

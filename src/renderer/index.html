@@ -202,16 +202,20 @@
           <span class="dock-sep" aria-hidden="true"></span>
         <div class="tools" id="tools" role="radiogroup" aria-label="Tool">
           <button class="btn icon tool" data-tool="text" role="radio" title="Type (T)" aria-label="Type"><svg class="ic"><use href="#i-type"/></svg></button>
+          <span class="tool-gap" aria-hidden="true"></span>
           <button class="btn icon tool" data-tool="pen" role="radio" title="Pen (P)" aria-label="Pen"><svg class="ic"><use href="#i-pen"/></svg></button>
           <button class="btn icon tool" data-tool="marker" role="radio" title="Marker (M)" aria-label="Marker"><svg class="ic"><use href="#i-marker"/></svg></button>
-          <button class="btn icon tool" data-tool="eraser" role="radio" title="Eraser (E)" aria-label="Eraser"><svg class="ic"><use href="#i-eraser"/></svg></button>
           <button class="btn icon tool" data-tool="shape" role="radio" title="Shapes (S)" aria-label="Shapes"><svg class="ic"><use href="#i-shapes"/></svg></button>
+          <span class="tool-gap" aria-hidden="true"></span>
+          <button class="btn icon tool" data-tool="eraser" role="radio" title="Eraser (E)" aria-label="Eraser"><svg class="ic"><use href="#i-eraser"/></svg></button>
           <button class="btn icon tool" data-tool="select" role="radio" title="Select ink (L)" aria-label="Select ink"><svg class="ic"><use href="#i-lasso"/></svg></button>
         </div>
           <span class="dock-sep" aria-hidden="true"></span>
           <button class="btn icon" data-cmd="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg class="ic"><use href="#i-undo"/></svg></button>
           <button class="btn icon" data-cmd="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg class="ic"><use href="#i-redo"/></svg></button>
-          <button class="btn icon focus-only" id="btn-focus-exit" data-cmd="toggle-focus" title="Leave focus mode (Esc)" aria-label="Leave focus mode"><svg class="ic"><use href="#i-close"/></svg></button>
+          <span class="dock-sep" aria-hidden="true"></span>
+          <button class="btn icon" id="dock-focus" data-cmd="toggle-focus" title="Focus mode: just the page and the tools (Ctrl+Shift+F)" aria-label="Focus mode" aria-pressed="false"><svg class="ic"><use href="#i-focus"/></svg></button>
+          <button class="btn icon" id="dock-fullscreen" data-cmd="toggle-fullscreen" title="Full screen (F11)" aria-label="Full screen" aria-pressed="false"><svg class="ic"><use href="#i-expand"/></svg></button>
         </div>
       </div>
       <div id="dock-ghost" aria-hidden="true"></div>
