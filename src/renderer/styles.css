@@ -149,6 +149,9 @@ select {
   background: var(--hover);
   cursor: pointer;
 }
+/* The open list is a native pop-up: give it solid theme colours, or Windows draws it white. */
+select option { background-color: var(--raised); color: var(--text); }
+select optgroup { background-color: var(--raised); color: var(--muted); font-weight: 600; }
 
 .seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--r-md); background: var(--hover); }
 .seg button {
@@ -237,10 +240,7 @@ body[data-view='home'] #dragbar, body.focus #dragbar { display: block; }
   border-radius: var(--r-xl);
   background: var(--raised);
   box-shadow: var(--shadow);
-  transition: opacity 0.25s var(--ease);
 }
-/* While you draw, the bar steps back so it never covers your line. */
-body.inking #dock { opacity: 0.18; pointer-events: none; }
 .dock-main { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s1); flex: none; }
 .dock-sep { width: 24px; height: 1px; margin: var(--s1) 0; background: var(--line); flex: none; }
 .dock-main .btn { color: var(--muted); }

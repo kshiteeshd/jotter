@@ -106,6 +106,18 @@ const AUDIT = String.raw`(label) => {
       if (r < 1.25 && !/inset/.test(s.boxShadow)) fails.push({ label, where: describe(el), kind: 'swatch', text: el.title || el.getAttribute('aria-label') || '', ratio: Math.round(r * 100) / 100, fg: hex(own), bg: hex(behind), outline: s.boxShadow });
     }
   }
+  // Drop-down lists open in a native pop-up: it uses the option's (or else the select's) own background
+  // only when that is solid, and plain white otherwise.
+  for (const sel of document.querySelectorAll('select')) {
+    for (const opt of sel.querySelectorAll('option, optgroup')) {
+      const own = parse(getComputedStyle(opt).backgroundColor);
+      const box = parse(getComputedStyle(sel).backgroundColor);
+      const bg = own && own[3] >= 1 ? own : box && box[3] >= 1 ? box : [255, 255, 255, 1];
+      const col = parse(getComputedStyle(opt).color);
+      const r = ratio(over(col, bg), bg);
+      if (r < 4.5) fails.push({ label, where: describe(sel) + ' list', kind: 'option', text: (opt.label || opt.textContent).slice(0, 32), ratio: Math.round(r * 100) / 100, fg: hex(col), bg: hex(bg) });
+    }
+  }
   return fails;
 }`;
 

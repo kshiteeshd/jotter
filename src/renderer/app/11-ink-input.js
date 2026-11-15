@@ -206,7 +206,6 @@ el.inkLayer.addEventListener('pointerdown', (e) => {
   if (e.button !== 0 && !penEraser) return;
   e.preventDefault();
   activeScale = sheetScale();
-  document.body.classList.add('inking'); // the dock steps back while you draw
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
   closePopovers();
   capture(e);
@@ -258,7 +257,6 @@ el.inkLayer.addEventListener('pointermove', (e) => {
 });
 
 function finishGesture(e) {
-  document.body.classList.remove('inking');
   if (pan && e.pointerId === pan.id) {
     pan = null;
     document.body.classList.remove('dragging');

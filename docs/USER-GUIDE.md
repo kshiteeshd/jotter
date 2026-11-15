@@ -12,7 +12,7 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 
 - **Top bar**: Home, show/hide the sidebar, the notebook name (click to rename) and current section, then the save dot, search, export as PDF and Settings. The dot is green when everything is saved, amber while saving, red if something could not be saved.
 - **Sidebar**: sections at the top, the pages of the current section below. Right-click a section or page for rename, colour, duplicate, move and delete. Drag pages to reorder them or onto a section to move them.
-- **Tool bar**: grouped as Type · Pen, Marker, Shapes · Eraser, Select, then Undo and Redo, then Focus mode and Full screen, with the chosen tool's options (colours, sizes, text styles, insert) beside them. It sits on the right at first; drag its grip (the six dots) to the left, top or bottom edge, or choose the side in **Settings → Tool bar**. The arrow folds the options away. While you draw, the bar fades so it never covers your line.
+- **Tool bar**: grouped as Type · Pen, Marker, Shapes · Eraser, Select, then Undo and Redo, then Focus mode and Full screen, with the chosen tool's options (colours, sizes, text styles, insert) beside them. It sits on the right at first; drag its grip (the six dots) to the left, top or bottom edge, or choose the side in **Settings → Tool bar**. The arrow folds the options away.
 - **Page title row**: the page name and the page type and paper switches stay fixed above the page while you scroll or zoom. The page is centred in the window.
 
 ## Writing
