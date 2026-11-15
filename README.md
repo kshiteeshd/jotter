@@ -52,4 +52,4 @@ A zip archive containing `notebook.json` (sections, page order, cover, settings)
 
 ---
 
-Copyright © 2026 Jotter.
+Copyright © 2026 Jotter. Released under the [MIT License](LICENSE).
