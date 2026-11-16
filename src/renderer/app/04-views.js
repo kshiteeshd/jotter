@@ -6,6 +6,7 @@ function setView(view) {
   closePopovers();
   hideFloatbars();
   applyCoverTheme();
+  placeSwitches();
 }
 
 async function showHome() {

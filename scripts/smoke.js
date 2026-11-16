@@ -208,13 +208,13 @@ app.whenReady().then(async () => {
   check('the page is centred with the options folded', await js(centred));
   await shot('05c-rail-folded');
   await js(`run('toggle-rail'); setTool('marker'); 0`);
-  const rowAt = `(() => { const r = document.getElementById('title-row').getBoundingClientRect(); const t = el.pageTitle.getBoundingClientRect(); return [r.top, r.height, t.left, t.width].map(Math.round).join(); })()`;
+  const rowAt = `(() => { const r = document.querySelector('.page-opts').getBoundingClientRect(); const t = el.pageTitle.getBoundingClientRect(); return [r.left, r.top, t.left, t.width].map(Math.round).join(); })()`;
   const rowBefore = await js(rowAt);
   await js(`el.workspace.scrollTop = 400; state.userZoomed = true; setZoom(1.5); 0`);
   await sleep(150);
   const rowAfter = await js(rowAt);
   await js(`run('zoom-reset'); el.workspace.scrollTop = 0; 0`);
-  check('the title row stays fixed while the page scrolls and zooms', rowBefore === rowAfter, `${rowBefore} / ${rowAfter}`);
+  check('the page name and switches stay put in the top bar while the page scrolls and zooms', rowBefore === rowAfter, `${rowBefore} / ${rowAfter}`);
 
   // ----- The tool bar docks to every edge, and everything lines up at every window size -----
   fs.mkdirSync(path.join(out, 'layout'), { recursive: true });
@@ -232,14 +232,16 @@ app.whenReady().then(async () => {
         if (dock.left < area.left - 1 || dock.right > area.right + 1 || dock.top < area.top - 1 || dock.bottom > area.bottom + 1) out.push('bar outside the page area');
         if (over(dock, top)) out.push('bar under the title bar');
         if (side.width && sheet.left < side.right - 1) out.push('page under the sidebar');
-        if (['left', 'right'].includes(document.body.dataset.dock) && over({ ...sheet.toJSON(), top: dock.top, bottom: dock.bottom }, dock)) out.push('page under the bar');
+        if (['left', 'right'].includes(document.body.dataset.dock) && over({ ...sheet.toJSON(), top: dock.top, bottom: dock.bottom }, dock)) out.push('page under the bar (sheet ' + Math.round(sheet.left) + '-' + Math.round(sheet.right) + ', bar ' + Math.round(dock.left) + '-' + Math.round(dock.right) + ', pad ' + el.workspace.style.paddingLeft + ', zoom ' + state.zoom + ')');
         const tb = document.getElementById('topbar');
         if (tb.scrollWidth > tb.clientWidth + 1) out.push('title bar overflows');
-        if (opts.right > area.right + 1) out.push('page switches cut off');
+        if (opts.right > top.right + 1 || opts.left < top.left) out.push('page switches cut off');
         if (el.workspace.scrollWidth > el.workspace.clientWidth + 1) out.push('page scrolls sideways');
-        const title = R(el.pageTitle);
-        if (Math.abs(title.left + 8 - sheet.left) > 2) out.push('title not lined up with the page');
-        if (sheet.width >= 480 && Math.abs(opts.right - sheet.right) > 2) out.push('page switches not lined up with the page');
+        const title = R(el.pageTitle), left = R('.tb-left'), right = R('.tb-right');
+        if (title.width < 60) out.push('page name squeezed');
+        if (over(opts, left) || over(opts, right)) out.push('page switches collide in the top bar');
+        if (innerWidth >= 1280 && Math.abs((opts.left + opts.right) / 2 - innerWidth / 2) > 2) out.push('page switches not centred');
+        if (R('#nb-name').width < 40) out.push('notebook name squeezed');
         const tools = document.querySelector('.tools').getBoundingClientRect();
         if (tools.bottom > area.bottom + 1 || tools.right > area.right + 1) out.push('tools cut off');
         return out.join(', ');
@@ -255,6 +257,13 @@ app.whenReady().then(async () => {
   await js(`document.getElementById('dock-focus').click(); 0`);
   await sleep(150);
   check('and off again', (await js(`document.body.classList.contains('focus')`)) === false);
+  const crumbs = await js(`(() => {
+    const parts = [document.querySelector('#nb-name span'), document.getElementById('crumb-section'), el.pageTitle].filter((e) => e.getBoundingClientRect().width);
+    const mids = parts.map((e) => { const r = e.getBoundingClientRect(); return r.top + r.height / 2; });
+    const fonts = new Set(parts.map((e) => { const c = getComputedStyle(e); return c.fontFamily + ' ' + c.fontSize; }));
+    return { spread: Math.max(...mids) - Math.min(...mids), fonts: fonts.size, family: getComputedStyle(el.pageTitle).fontFamily, loaded: document.fonts.check('600 14px "Plus Jakarta Sans Variable"') };
+  })()`);
+  check('notebook, section and page names share one typeface and line', crumbs.spread <= 1 && crumbs.fonts === 1 && crumbs.loaded, JSON.stringify(crumbs));
   check('tool bar and page line up at every size and edge', !layoutProblems.length, layoutProblems.join(' | '));
   win.setSize(860, 560);
   await js(`showHome(); 0`);

@@ -58,7 +58,8 @@
 
   <div id="dragbar" aria-hidden="true"></div>
 
-  <!-- The title bar: where you are on the left, what you can do with the notebook on the right. -->
+  <!-- The title bar: where you are (notebook / section / page) on the left, the page's type and paper in the middle,
+       what you can do on the right. -->
   <header id="topbar" aria-label="Notebook">
     <div class="tb-left">
       <button class="btn icon" data-cmd="home" title="Home (Ctrl+H)" aria-label="Home"><svg class="ic"><use href="#i-home"/></svg></button>
@@ -67,7 +68,23 @@
         <button id="nb-name" title="Rename notebook"><span>Untitled</span><svg class="ic"><use href="#i-edit"/></svg></button>
         <span class="crumb-sep" aria-hidden="true">/</span>
         <span id="crumb-section"></span>
+        <span class="crumb-sep sec-sep" aria-hidden="true">/</span>
+        <input id="page-title" type="text" maxlength="120" placeholder="Page title" spellcheck="false" aria-label="Page title">
       </span>
+    </div>
+    <!-- The open page's type and paper, in the middle of the bar. -->
+    <div class="page-opts">
+      <div class="seg small" id="page-mode" role="radiogroup" aria-label="Page type">
+        <button data-value="paged" role="radio" title="A4 sheets with page breaks">Paged</button>
+        <button data-value="infinite" role="radio" title="One continuous page that fills the window and keeps growing">Infinite</button>
+      </div>
+      <div class="seg small" id="paper-style" role="radiogroup" aria-label="Lines">
+        <button data-value="plain" role="radio" title="Plain paper">Plain</button>
+        <button data-value="ruled" role="radio" title="Ruled lines">Ruled</button>
+        <button data-value="grid" role="radio" title="Squared grid">Grid</button>
+        <button data-value="dotted" role="radio" title="Dot grid">Dots</button>
+        <button data-value="kolam" role="radio" title="Kolam dot grid">Kolam</button>
+      </div>
     </div>
     <div class="tb-right">
       <span id="save-state" data-state="saved" title="All changes saved"><i aria-hidden="true"></i><span></span></span>
@@ -101,24 +118,8 @@
       </div>
     </aside>
 
-    <!-- The page area: a fixed title row above the scrolling, zoomable page. -->
+    <!-- The page area: the scrolling, zoomable page and the tool bar. -->
     <div id="page-area">
-      <div id="title-row">
-        <input id="page-title" type="text" maxlength="120" placeholder="Page title" spellcheck="false" aria-label="Page title">
-        <div class="page-opts">
-          <div class="seg small" id="page-mode" role="radiogroup" aria-label="Page type">
-            <button data-value="paged" role="radio" title="A4 sheets with page breaks">Paged</button>
-            <button data-value="infinite" role="radio" title="One continuous page that fills the window and keeps growing">Infinite</button>
-          </div>
-          <div class="seg small" id="paper-style" role="radiogroup" aria-label="Lines">
-            <button data-value="plain" role="radio" title="Plain paper">Plain</button>
-            <button data-value="ruled" role="radio" title="Ruled lines">Ruled</button>
-            <button data-value="grid" role="radio" title="Squared grid">Grid</button>
-            <button data-value="dotted" role="radio" title="Dot grid">Dots</button>
-            <button data-value="kolam" role="radio" title="Kolam dot grid">Kolam</button>
-          </div>
-        </div>
-      </div>
       <main id="workspace">
         <div id="sheet-wrap">
           <div id="sheet">

@@ -10,6 +10,13 @@
   - Character comes from the notebook covers, the accent each cover gives the app, and small kolam
     diamonds (icons, empty pages, dialogs, home).
 */
+/* Typefaces, bundled so they work offline (SIL Open Font License, see fonts/OFL-*.txt):
+   Plus Jakarta Sans for the interface, Fraunces for titles. */
+@font-face { font-family: 'Plus Jakarta Sans Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Plus Jakarta Sans Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/plus-jakarta-sans-latin-ext-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: 'Fraunces Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/fraunces-latin-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: 'Fraunces Variable'; font-style: normal; font-display: swap; font-weight: 100 900; src: url('fonts/fraunces-latin-ext-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+
 :root {
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
   --t-xs: 11px; --t-sm: 12px; --t-md: 13px; --t-lg: 15px; --t-xl: 18px; --t-2xl: 24px; --t-3xl: 32px;
@@ -40,8 +47,8 @@
   --sheet-shadow: 0 0 0 1px rgba(15, 15, 20, 0.05), 0 1px 3px rgba(15, 15, 20, 0.06), 0 12px 36px rgba(15, 15, 20, 0.07);
   --break: rgba(15, 15, 20, 0.32);
   --paper: #ffffff;
-  --serif: 'Sitka Heading', 'Sitka Text', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
-  --sans: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --serif: 'Fraunces Variable', 'Sitka Heading', 'Palatino Linotype', Georgia, serif;
+  --sans: 'Plus Jakarta Sans Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --motif: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='12' viewBox='0 0 20 12'%3E%3Cpath d='M10 1.5 14.5 6 10 10.5 5.5 6z' fill='none' stroke='%23b0462b' stroke-width='1'/%3E%3Cpath d='M10 4.6 11.4 6 10 7.4 8.6 6z' fill='%23c98a12'/%3E%3Cpath d='M0 5.2.8 6 0 6.8-.8 6zM20 5.2l.8.8-.8.8-.8-.8z' fill='%23c98a12'/%3E%3C/svg%3E");
   color-scheme: light;
 }
@@ -192,20 +199,27 @@ select optgroup { background-color: var(--raised); color: var(--muted); font-wei
   -webkit-app-region: drag;
 }
 #topbar :is(button, input, select) { -webkit-app-region: no-drag; }
+/* Equal side columns keep the switches in the middle of the window (over the page); when space is short the
+   left column (the names) gives way first, never the switches or the buttons. */
+#topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr); }
 .tb-left, .tb-right { display: flex; align-items: center; gap: 2px; min-width: 0; }
-.tb-left { flex: 1 1 auto; }
-.tb-right { flex: none; }
+.tb-right { justify-self: end; }
+/* Page type and paper: plain words in the middle of the bar; their track appears when you point at them. */
+.page-opts { display: flex; align-items: center; gap: var(--s2); }
+.page-opts .seg { background: transparent; transition: background-color 0.15s; }
+.page-opts .seg:hover, .page-opts .seg:focus-within { background: var(--hover); }
 #topbar .btn { color: var(--muted); }
 #topbar .btn:hover { color: var(--text); }
 #topbar .btn[aria-pressed='true'] { background: transparent; color: var(--text); }
 #topbar .btn[aria-expanded='true'] { color: var(--accent); }
 
-.crumbs { display: flex; align-items: center; gap: var(--s1); min-width: 0; margin-left: var(--s2); }
+/* Where you are: notebook / section / page, one typeface and size on one line. */
+.crumbs { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; margin-left: var(--s2); font-size: 14px; line-height: 30px; }
 #nb-name {
   display: flex; align-items: center; gap: var(--s2);
-  min-width: 0; max-width: 34vw; height: 30px; padding: 0 var(--s2);
+  flex: none; min-width: 48px; max-width: 18vw; height: 30px; padding: 0 var(--s2);
   border: 0; border-radius: var(--r-md); background: transparent; color: var(--text); cursor: text;
-  font-family: var(--serif); font-size: var(--t-lg); font-weight: 600; text-align: left;
+  font: 700 14px / 30px var(--sans); letter-spacing: -0.005em; text-align: left;
 }
 #nb-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #nb-name .ic { display: none; }
@@ -213,13 +227,22 @@ select optgroup { background-color: var(--raised); color: var(--muted); font-wei
 #nb-rename {
   width: 260px; max-width: 34vw; height: 30px; padding: 0 var(--s2);
   border: 0; border-radius: var(--r-md); background: var(--surface); color: var(--text); outline: 2px solid var(--accent);
-  font-family: var(--serif); font-size: var(--t-lg); font-weight: 600; -webkit-app-region: no-drag;
+  font: 700 14px / 30px var(--sans); -webkit-app-region: no-drag;
 }
-.crumb-sep { color: var(--faint); }
-#crumb-section { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22vw; }
+.crumb-sep { flex: none; padding: 0 2px; color: var(--faint); font-weight: 400; }
+#crumb-section { flex: 0 1 auto; padding: 0 var(--s1); color: var(--muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 16vw; }
+/* The page's name: part of the path, editable in place. */
+#page-title {
+  flex: 1 1 120px; min-width: 64px; max-width: 360px; height: 30px; padding: 0 var(--s2);
+  border: 0; border-radius: var(--r-md); background: transparent; color: var(--text); outline: 0;
+  font: 600 14px / 30px var(--sans); text-overflow: ellipsis; user-select: text;
+}
+#page-title::placeholder { color: var(--faint); }
+#page-title:hover { background: var(--hover); }
+#page-title:focus { background: var(--hover); box-shadow: inset 0 -2px 0 var(--accent); }
 
 /* Save state: a dot in a fixed-width slot. Calm when saved; words only when something needs you. */
-#save-state { display: flex; align-items: center; justify-content: flex-end; gap: var(--s2); width: 116px; margin-right: var(--s2); font-size: var(--t-sm); color: var(--muted); white-space: nowrap; overflow: hidden; }
+#save-state { display: flex; align-items: center; justify-content: flex-end; gap: var(--s2); width: 100px; margin-right: var(--s2); font-size: var(--t-sm); color: var(--muted); white-space: nowrap; overflow: hidden; }
 #save-state i { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #3f8f5a; opacity: 0.55; transition: background-color 0.2s, opacity 0.2s; }
 #save-state[data-state='pending'] i, #save-state[data-state='saving'] i { background: #c98a12; opacity: 1; }
 #save-state[data-state='failed'] i, #save-state[data-state='unsaved'] i { background: var(--danger); opacity: 1; }
@@ -317,7 +340,7 @@ body[data-dock='left'] .tool.active::after { left: auto; right: 3px; }
 /* Top and bottom: a row centred on the page area's width. */
 body:is([data-dock='top'], [data-dock='bottom']) #dock { left: 50%; transform: translateX(-50%); flex-direction: column; align-items: center; max-width: calc(100% - var(--s6)); }
 body[data-dock='bottom'] #dock { bottom: var(--s4); }
-body[data-dock='top'] #dock { top: 68px; flex-direction: column-reverse; }
+body[data-dock='top'] #dock { top: var(--s4); flex-direction: column-reverse; }
 body[data-dock='bottom'] #btn-rail .ic { transform: rotate(0deg); }
 body[data-dock='bottom'].rail-collapsed #btn-rail .ic { transform: rotate(180deg); }
 body[data-dock='top'] #btn-rail .ic { transform: rotate(180deg); }
@@ -341,7 +364,7 @@ body:is([data-dock='top'], [data-dock='bottom']) .tool.active::after { left: 50%
 #dock-ghost[data-side] { display: block; }
 #dock-ghost[data-side='right'] { right: var(--s3); top: var(--s4); bottom: var(--s4); width: 60px; }
 #dock-ghost[data-side='left'] { left: var(--s3); top: var(--s4); bottom: var(--s4); width: 60px; }
-#dock-ghost[data-side='top'] { top: 68px; left: var(--s6); right: var(--s6); height: 56px; }
+#dock-ghost[data-side='top'] { top: var(--s4); left: var(--s6); right: var(--s6); height: 56px; }
 #dock-ghost[data-side='bottom'] { bottom: var(--s4); left: var(--s6); right: var(--s6); height: 56px; }
 
 body[data-tool='text'] :is(#size-options, #shape-options, #eraser-mode-row, #select-hint),
@@ -510,44 +533,19 @@ body.no-sidebar #sidebar { display: none; }
 
 /* ---------- Page ---------- */
 /* Equal room on both sides, so the page is always centred; the room matches the tool rail's width. */
-:root { --rail-room: 140px; --pad-top: 2px; --pad-bottom: var(--s7); }
+:root { --rail-room: 140px; --pad-top: var(--s5); --pad-bottom: var(--s7); }
 body.rail-collapsed { --rail-room: 84px; }
 /* Docked at the top or bottom, the bar takes room above or below the page instead of beside it. */
 body:is([data-dock='top'], [data-dock='bottom']) { --rail-room: var(--s6); }
-body[data-dock='top'] { --pad-top: 112px; }
-body[data-dock='top'].rail-collapsed { --pad-top: 64px; }
+body[data-dock='top'] { --pad-top: 136px; }
+body[data-dock='top'].rail-collapsed { --pad-top: 88px; }
 body[data-dock='bottom'] { --pad-bottom: 132px; }
 #workspace { flex: 1; overflow: auto; min-width: 0; min-height: 0; padding: var(--pad-top) var(--rail-room) var(--pad-bottom); }
 /* Docked on the left, the room for the bar is on the left (set by centrePage); the right needs only a margin. */
 body[data-dock='left'] #workspace { padding-right: var(--s4); }
 #sheet-wrap { width: 794px; margin: 0; } /* placed by centrePage() */
-/* The page area: the title row stays fixed while the page below scrolls and zooms. */
+/* The page area: the scrolling, zoomable page, with the tool bar docked to one of its edges. */
 #page-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-#title-row { display: flex; align-items: center; gap: var(--s3); flex: none; height: 64px; padding: 0 var(--rail-room); }
-/* Page type and lines: plain words beside the title; their track appears when you point at the row. */
-.page-opts { display: flex; align-items: center; gap: var(--s2); flex: none; }
-.page-opts .seg { background: transparent; transition: background-color 0.15s; }
-#title-row:hover .page-opts .seg, .page-opts .seg:focus-within { background: var(--hover); }
-#page-title {
-  flex: 1;
-  min-width: 0;
-  height: 44px;
-  margin-left: calc(-1 * var(--s2));
-  padding: 0 var(--s2);
-  border: 0;
-  border-radius: var(--r-md);
-  background: transparent;
-  color: var(--text);
-  font-family: var(--serif);
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  outline: 0;
-  user-select: text;
-}
-#page-title::placeholder { color: var(--faint); }
-#page-title:hover { background: var(--hover); }
-#page-title:focus { background: var(--hover); box-shadow: inset 0 -2px 0 var(--accent); }
 
 #sheet {
   position: relative;
@@ -677,7 +675,11 @@ body.focus :is(#topbar, #sidebar, #zoom-ctl) { display: none; }
 
 /* Narrower windows */
 @media (max-width: 1280px) {
-  #crumb-section, .crumb-sep { display: none; }
+  #crumb-section, .crumb-sep:not(.sec-sep) { display: none; }
+}
+@media (max-width: 980px) {
+  #zoom-ctl { display: none; } /* Ctrl + wheel, pinch and Ctrl+= / Ctrl+- still zoom */
+  .page-opts .seg.small button { padding: 0 6px; }
 }
 @media (max-width: 1080px) {
   .hero .fan { display: none; }

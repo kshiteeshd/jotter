@@ -43,5 +43,24 @@ function updateWco() {
   });
 }
 navigator.windowControlsOverlay?.addEventListener('geometrychange', updateWco);
+
+// The page switches sit over the middle of the window (where the page is), not the middle of the bar, which
+// the window buttons push to the left; they never move so far that they touch the buttons on the right.
+const pageOpts = document.querySelector('.page-opts');
+function placeSwitches() {
+  if (state.view !== 'editor') return;
+  pageOpts.style.transform = '';
+  const o = pageOpts.getBoundingClientRect();
+  if (!o.width) return;
+  const right = document.querySelector('.tb-right').getBoundingClientRect();
+  const shift = Math.max(0, Math.min(innerWidth / 2 - (o.left + o.right) / 2, right.left - 8 - o.right));
+  pageOpts.style.transform = `translateX(${Math.round(shift)}px)`;
+}
+new ResizeObserver(placeSwitches).observe(document.getElementById('topbar'));
+// Text widths change when the bundled fonts finish loading: measure the layout again then.
+document.fonts.addEventListener('loadingdone', () => {
+  placeSwitches();
+  if (typeof onViewportChange === 'function') onViewportChange();
+});
 window.addEventListener('resize', updateWco);
 

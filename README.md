@@ -54,3 +54,5 @@ A zip archive containing `notebook.json` (sections, page order, cover, settings)
 ---
 
 Copyright © 2026 Jotter. Released under the [MIT License](LICENSE).
+
+Typefaces: [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) and [Fraunces](https://github.com/undercasetype/Fraunces), both under the SIL Open Font License 1.1 (see `src/renderer/fonts/`).

@@ -10,10 +10,9 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 
 ## The notebook window
 
-- **Top bar**: Home, show/hide the sidebar, the notebook name (click to rename) and current section, then the save dot, search, export as PDF and Settings. The dot is green when everything is saved, amber while saving, red if something could not be saved.
+- **Top bar**: on the left Home, show/hide the sidebar, then where you are: the notebook name (click to rename), the section, and the page name (click to edit). In the middle, over the page, the page's type (Paged / Infinite) and paper (Plain, Ruled, Grid, Dots, Kolam). On the right the save dot, zoom, search, export as PDF and Settings. The dot is green when everything is saved, amber while saving, red if something could not be saved.
 - **Sidebar**: sections at the top, the pages of the current section below. Right-click a section or page for rename, colour, duplicate, move and delete. Drag pages to reorder them or onto a section to move them.
 - **Tool bar**: grouped as Type · Pen, Marker, Shapes · Eraser, Select, then Undo and Redo, then Focus mode and Full screen, with the chosen tool's options (colours, sizes, text styles, insert) beside them. It sits on the right at first; drag its grip (the six dots) to the left, top or bottom edge, or choose the side in **Settings → Tool bar**. The arrow folds the options away.
-- **Page title row**: the page name and the page type and paper switches stay fixed above the page while you scroll or zoom. The page is centred in the window.
 
 ## Writing
 
@@ -27,7 +26,7 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 
 ## Pages
 
-Beside the page title:
+The switches in the middle of the top bar:
 
 - **Paged** gives A4 sheets. Sheets are separated by a visible gap with the sheet number; **Add a sheet** under the last one adds more room. PDF export splits pages exactly at the gaps.
 - **Infinite** gives one page that fills the window and grows as you scroll.

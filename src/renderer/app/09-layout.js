@@ -34,10 +34,6 @@ function centrePage() {
   const minLeft = dock === 'left' ? railRoom : MIN_GAP;
   const minRight = dock === 'right' ? railRoom : MIN_GAP;
   const place = (width, span) => Math.max(minLeft, Math.min(mid - width / 2, span - minRight - width));
-  // The title row matches the page at its fitted size: it lines up with the page at any window size, and
-  // stays where it is when you zoom in or out yourself.
-  const fitW = W * fitZoom();
-  placeTitleRow(place(fitW, wr.width), Math.max(fitW, 480), wr.width, minRight);
   if (page().mode === 'infinite') {
     ws.style.paddingLeft = '';
     const z = state.zoom;
@@ -46,13 +42,6 @@ function centrePage() {
   }
   el.editor.style.marginLeft = '';
   ws.style.paddingLeft = `${Math.round(place(el.sheetWrap.getBoundingClientRect().width, ws.clientWidth))}px`;
-}
-
-// The title row sits over the page's column at its normal size: it does not scroll or zoom with the page.
-function placeTitleRow(left, rowW, width, minRight) {
-  const row = el.pageTitle.parentElement;
-  row.style.paddingLeft = `${Math.round(left)}px`;
-  row.style.paddingRight = `${Math.round(Math.max(minRight, width - left - rowW))}px`;
 }
 
 function layoutSheets() {
