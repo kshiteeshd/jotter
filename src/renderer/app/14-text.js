@@ -45,24 +45,15 @@ function syncFormatUi() {
 }
 
 function onEditorChanged() {
-  textSig = editorSig();
-  markDirty();
+  editorChanged = true;
+  markDirty(page(), 'text');
   CSS.highlights?.delete('search');
   if (page().mode === 'infinite') ensureRoom(textBottom(el.editor));
   else growToFit();
   updateBlank();
 }
 
-el.editor.addEventListener('input', (e) => {
-  // Typing starts (or continues) a text run in the undo order; the editor's own undo and redo do not.
-  if (e.inputType !== 'historyUndo' && e.inputType !== 'historyRedo') {
-    const top = order.at(-1);
-    if (!top || top === 'ink') order.push({ before: textSig });
-    redoOrder = [];
-    if (state.nb) pageHistory().redo.length = 0;
-  }
-  onEditorChanged();
-});
+el.editor.addEventListener('input', onEditorChanged);
 
 const selectionNode = () => {
   const n = window.getSelection().anchorNode;

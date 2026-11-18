@@ -96,16 +96,6 @@ function setColor(color) {
   syncToolUi();
 }
 
-function makeSwatch(hex, name, attr = 'color') {
-  const b = document.createElement('button');
-  b.className = 'swatch';
-  b.dataset[attr] = hex;
-  b.style.background = hex;
-  b.title = name;
-  b.setAttribute('role', 'radio');
-  b.setAttribute('aria-label', name);
-  return b;
-}
 
 for (const [hex, name] of Model.INKS) {
   el.swatches.append(makeSwatch(hex, name));

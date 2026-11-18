@@ -102,12 +102,13 @@ function setNotebook(nb, path, dirty = false) {
   state.dirty = dirty;
   state.secIdx = 0;
   state.pageIdx = 0;
-  inkHistory.clear();
+  undoLog.base = null; // no history is recorded while the notebook opens
   sent = Model.newSent();
   setView('editor');
   loadPage();
   renderSidebar();
   if (dirty) markDirty(null);
+  resetHistory();
 }
 
 async function loadFile(file, dirty = false, pathOverride) {

@@ -1,8 +1,13 @@
 // ---------- Page ----------
 
+// The page the editor is showing. Its text is saved into this page and no other, even when the open page
+// has already changed (adding or moving pages switches page before the editor reloads).
+let editorPage = null;
+
 // The live page's text goes back into the model (editing attributes are left out).
 function commitEditor() {
-  if (state.nb && state.view === 'editor') page().html = el.editor.innerHTML.replace(/ contenteditable="(true|false)"/g, '');
+  if (state.nb && state.view === 'editor' && editorPage) editorPage.html = el.editor.innerHTML.replace(/ contenteditable="(true|false)"/g, '');
+  editorChanged = false;
 }
 
 function loadPage(rebuildList = true) {
@@ -11,10 +16,9 @@ function loadPage(rebuildList = true) {
   hideFloatbars();
   CSS.highlights?.delete('search');
   el.editor.innerHTML = p.html;
+  editorPage = p;
+  editorChanged = false;
   prepareBoxes();
-  order = [];
-  redoOrder = [];
-  textSig = editorSig();
   // A short fade as the page changes.
   el.sheet.classList.remove('swap');
   void el.sheet.offsetWidth;

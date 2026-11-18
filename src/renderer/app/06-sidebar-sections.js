@@ -90,7 +90,6 @@ async function deleteSection(i) {
     });
     if (r !== 0) return;
   }
-  for (const p of s.pages) inkHistory.delete(p.id);
   nb.sections.splice(i, 1);
   if (i < state.secIdx || state.secIdx >= nb.sections.length) state.secIdx = Math.max(0, state.secIdx - 1);
   state.pageIdx = Math.min(section().lastPage || 0, pages().length - 1);

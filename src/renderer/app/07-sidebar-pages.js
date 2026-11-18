@@ -87,7 +87,6 @@ async function deletePage(idx) {
     });
     if (r !== 0) return;
   }
-  inkHistory.delete(p.id);
   pages().splice(idx, 1);
   if (!pages().length) pages().push(Model.newPage('Page 1', { paper: p.paper, mode: p.mode }));
   if (idx < state.pageIdx || state.pageIdx >= pages().length) state.pageIdx = Math.max(0, state.pageIdx - 1);
@@ -258,7 +257,7 @@ document.addEventListener('dragend', () => {
 
 el.pageTitle.addEventListener('input', () => {
   page().title = el.pageTitle.value.trim() || 'Untitled page';
-  markDirty();
+  markDirty(page(), 'text');
   const active = el.pageList.querySelector('li[aria-selected="true"] .title');
   if (active) active.textContent = page().title;
 });

@@ -200,6 +200,22 @@ function createWindow(boot = {}) {
   };
   windows.set(ctx.id, ctx);
 
+  // Undo and redo reach the notebook however they are given: the keyboard, a tablet pen button set to
+  // Ctrl+Z, or an "Undo" app command from a pen or mouse driver. They are caught here, before the page,
+  // so the page's own text undo never runs in their place.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || !(input.control || input.meta) || input.alt) return;
+    const k = (input.key || '').toLowerCase();
+    const z = k === 'z' || input.code === 'KeyZ';
+    const y = k === 'y' || input.code === 'KeyY';
+    if (!z && !y) return;
+    event.preventDefault();
+    win.webContents.send('command', z && !input.shift ? 'undo' : 'redo');
+  });
+  win.on('app-command', (_e, name) => {
+    if (name === 'undo' || name === 'redo') win.webContents.send('command', name);
+  });
+
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
   win.webContents.on('did-finish-load', () => win.webContents.setZoomFactor(uiScale()));

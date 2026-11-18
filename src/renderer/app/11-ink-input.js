@@ -216,7 +216,7 @@ el.inkLayer.addEventListener('pointerdown', (e) => {
   if (tool === 'shape') {
     current = { pointerId: e.pointerId, tool, kind: t.kind, color: t.color, size: t.size, x0: x, y0: y, x1: x, y1: y };
   } else if (tool === 'eraser') {
-    current = { pointerId: e.pointerId, tool, size: t.size, mode: state.settings.eraserMode, before: page().strokes, last: [x, y] };
+    current = { pointerId: e.pointerId, tool, size: t.size, mode: state.settings.eraserMode, last: [x, y] };
     eraseAlong(x, y, x, y);
   } else {
     current = { pointerId: e.pointerId, tool, color: t.color, size: t.size, points: [x, y], raw: [x, y] };
@@ -278,7 +278,7 @@ function finishGesture(e) {
   if (c.tool === 'lasso') return finishLasso(c);
   const p = page();
   if (c.tool === 'eraser') {
-    if (c.changed) setStrokes(p.strokes, c.before);
+    if (c.changed) setStrokes(p.strokes);
     return;
   }
   let stroke;

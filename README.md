@@ -28,8 +28,10 @@ Requires Node.js 20 or later on Windows.
 ```bash
 npm install
 npm start          # run the app
-npm test           # unit tests (file format and ink geometry)
-npm run test:app   # end-to-end test in Electron (writes screenshots to test-output/)
+npm test           # everything: unit tests, then the app tests (about 15 seconds)
+npm run test:unit  # file format and ink geometry only
+npm run test:app   # the real app, driven by mouse and keyboard; add group names to run some
+npm run audit:contrast  # colour contrast of every screen, theme and cover
 npm run dist       # build the installer into dist/
 ```
 
@@ -45,7 +47,8 @@ npm run dist       # build the installer into dist/
 | `src/renderer/ink.js` | Ink geometry: smoothing, tapering, erasing, hit-testing, drawing |
 | `src/renderer/model.js` | The notebook model, templates, sanitising and save building |
 | `src/renderer/app/` | The app itself, in numbered modules loaded in order |
-| `scripts/` | Tests, the colour-contrast audit, icon and installer artwork generators |
+| `test/` | `unit.test.js` (Node) and `app.e2e.js` (the app, end to end) |
+| `scripts/` | The colour-contrast audit, icon and installer artwork generators |
 
 ## The `.ntb` format
 

@@ -1,6 +1,6 @@
 {
   "name": "jotter",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "A simple notebook app for typing and handwriting",
   "main": "src/main.js",
   "author": "Jotter",
@@ -10,8 +10,10 @@
     "start": "electron .",
     "icon": "electron scripts/make-icon.js",
     "dist": "electron-builder --win nsis --x64",
-    "test": "node --test scripts/unit.test.js",
-    "test:app": "electron scripts/smoke.js test-output"
+    "test": "node --test test/unit.test.js && electron test/app.e2e.js",
+    "test:unit": "node --test test/unit.test.js",
+    "test:app": "electron test/app.e2e.js",
+    "audit:contrast": "electron scripts/contrast.js contrast-out"
   },
   "build": {
     "appId": "com.jotter.notebook",

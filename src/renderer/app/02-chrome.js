@@ -30,9 +30,11 @@ function syncChrome() {
 let autoTimer = 0;
 let thumbTimer = 0;
 
-// Record a change. `p` is the page that changed (null when only the notebook's structure changed).
-function markDirty(p = state.nb && page()) {
+// Record a change. `p` is the page that changed (null when only the notebook's structure changed);
+// `kind` is 'text' for typing, which Undo takes back a run at a time.
+function markDirty(p = state.nb && page(), kind = 'edit') {
   if (p) p.rev++;
+  recordChange(kind);
   state.changes++;
   clearTimeout(autoTimer);
   autoTimer = setTimeout(autoTick, AUTOSAVE_DELAY);

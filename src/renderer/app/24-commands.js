@@ -13,6 +13,15 @@ async function createNotebook(cover, name = '') {
   if (state.tool === 'text') el.editor.focus();
 }
 
+// In a text field of its own (search, a dialog, renaming), Undo works on that field's text only.
+function fieldEdit(cmd) {
+  const a = document.activeElement;
+  const field = a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && /^(text|search)$/.test(a.type))) && a !== el.pageTitle;
+  if (!field && !document.querySelector('dialog[open]')) return false;
+  if (field) document.execCommand(cmd);
+  return true;
+}
+
 const commands = {
   new: async () => {
     const info = await api.libraryInfo();
@@ -54,8 +63,8 @@ const commands = {
       api.closeConfirmed();
     }
   },
-  undo,
-  redo,
+  undo: () => fieldEdit('undo') || (state.view === 'editor' && undo()),
+  redo: () => fieldEdit('redo') || (state.view === 'editor' && redo()),
   'add-page': () => addPage(),
   'add-section': addSection,
   'rename-section': () => renameSection(),
@@ -97,7 +106,7 @@ const MODAL = new Set([
   'print', 'request-close', 'clear-ink', 'delete-page', 'delete-section', 'insert-link',
 ]);
 // Commands that work without an open notebook on screen.
-const ANYWHERE = new Set(['quick-new', 'trash', 'library-open', 'library-change', 'new', 'open', 'home', 'back', 'request-close', 'toggle-fullscreen', 'toggle-view-panel', 'settings', 'shortcuts', 'about', 'new-window']);
+const ANYWHERE = new Set(['undo', 'redo', 'quick-new', 'trash', 'library-open', 'library-change', 'new', 'open', 'home', 'back', 'request-close', 'toggle-fullscreen', 'toggle-view-panel', 'settings', 'shortcuts', 'about', 'new-window']);
 
 async function run(name, fn = commands[name]) {
   if (!fn) return;

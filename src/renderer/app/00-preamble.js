@@ -83,7 +83,17 @@ const state = {
 };
 
 let sent = Model.newSent(); // which pages and images the main process already holds
-const inkHistory = new Map(); // page id -> { undo: [], redo: [] } of { before, after } stroke lists
 const tiles = new Map(); // sheet index -> canvas (only sheets near the viewport exist)
 let busy = false; // a modal flow (dialogs, saving) is in progress
 
+// A round colour button (ink, paper and section colours). Defined here, before any file that builds them.
+function makeSwatch(hex, name, attr = 'color') {
+  const b = document.createElement('button');
+  b.className = 'swatch';
+  b.dataset[attr] = hex;
+  b.style.background = hex;
+  b.title = name;
+  b.setAttribute('role', 'radio');
+  b.setAttribute('aria-label', name);
+  return b;
+}

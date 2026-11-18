@@ -1,4 +1,4 @@
-// Unit tests for the file format and the ink geometry: `node --test scripts/`
+// Unit tests for the file format and the ink geometry: `node --test test/`
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
