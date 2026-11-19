@@ -76,12 +76,51 @@ function endTyping() {
   undoLog.base = snapshot();
 }
 
-// Put the notebook back to a snapshot and open the page it was on.
+// The part of a page (sheet units, top to bottom) where its ink differs between two versions of it.
+function inkChange(before, after) {
+  if (!before || before.strokes === after.strokes) return null;
+  const was = new Set(before.strokes);
+  const now = new Set(after.strokes);
+  let top = Infinity;
+  let bottom = -Infinity;
+  for (const s of [...before.strokes.filter((x) => !now.has(x)), ...after.strokes.filter((x) => !was.has(x))]) {
+    const b = Ink.box(s);
+    top = Math.min(top, b.minY - b.pad);
+    bottom = Math.max(bottom, b.maxY + b.pad);
+  }
+  return top === Infinity ? null : { top, bottom };
+}
+
+// Scroll just enough to bring part of the page into view; leave the view alone if it is already there.
+function reveal({ top, bottom }) {
+  const s = sheetScale();
+  if (!s) return;
+  const ws = el.workspace.getBoundingClientRect();
+  const y0 = s.rect.top + top / s.k;
+  const y1 = s.rect.top + bottom / s.k;
+  const margin = 48;
+  if (y0 >= ws.top + margin && y1 <= ws.bottom - margin) return;
+  el.workspace.scrollTop += y1 - y0 > ws.height - 2 * margin || y0 < ws.top + margin ? y0 - (ws.top + margin) : y1 - (ws.bottom - margin);
+}
+
+// What the sidebar shows, to tell whether it needs drawing again.
+const sidebarSig = (nb) => JSON.stringify(nb.sections.map((s) => [s.title, s.color, s.pages.map((p) => [p.id, p.title])]));
+
+/*
+  Put the notebook back to a snapshot. The page you are looking at is not reloaded: only what changed on
+  it is updated in place (its ink, its text, its title, its paper), so the view stays exactly where it is,
+  moving only if the change is out of sight. A change on another page opens that page, at the change.
+*/
 function restoreSnapshot(snap) {
   undoLog.restoring = true;
   try {
     clearSelection();
+    hideFloatbars();
     const nb = state.nb;
+    const shown = page();
+    const before = { sidebar: sidebarSig(nb), paperColor: nb.paperColor, cover: nb.cover, sec: state.secIdx };
+    const old = new Map();
+    for (const s of nb.sections) for (const p of s.pages) old.set(p.id, p);
     nb.paperColor = snap.paperColor;
     nb.cover = snap.cover;
     nb.sections = snap.sections.map((s) => ({ ...s, pages: s.pages.map((p) => ({ ...p, rev: ++revSeq })) }));
@@ -90,10 +129,32 @@ function restoreSnapshot(snap) {
     nb.sections.forEach((s, si) => s.pages.forEach((p, pi) => p.id === snap.at.id && ([sec, pg] = [si, pi])));
     state.secIdx = sec;
     state.pageIdx = pg;
-    editorChanged = false;
-    loadPage();
-    renderSidebar();
-    applyCoverTheme();
+    const now = page();
+
+    if (now.id === shown.id) {
+      editorPage = now;
+      editorChanged = false;
+      if (now.html !== shown.html) {
+        el.editor.innerHTML = now.html;
+        prepareBoxes();
+      }
+      if (now.title !== shown.title) el.pageTitle.value = now.title;
+      if (now.mode !== shown.mode || now.paper !== shown.paper || nb.paperColor !== before.paperColor) applyPaper();
+      if (now.mode !== shown.mode || now.sheets !== shown.sheets) layoutSheets();
+      if (now.strokes !== shown.strokes) redrawInk();
+      if (now.html !== shown.html) now.mode === 'paged' ? growToFit() : ensureRoom(textBottom(el.editor));
+      const change = inkChange(shown, now);
+      if (change) reveal(change);
+    } else {
+      loadPage(false);
+      const change = inkChange(old.get(now.id), now);
+      if (change) reveal(change);
+    }
+    if (sidebarSig(nb) !== before.sidebar || state.secIdx !== before.sec) renderSidebar();
+    else markActiveInList();
+    if (nb.cover !== before.cover) applyCoverTheme();
+    updateBlank();
+    syncChrome();
     markDirty(null);
   } finally {
     undoLog.restoring = false;

@@ -10,7 +10,9 @@ function commitEditor() {
   editorChanged = false;
 }
 
-function loadPage(rebuildList = true) {
+// `scroll`: keep the view where it was ({ top, left }) instead of starting at the top; `fade`: the short
+// fade that shows a different page has opened.
+function loadPage(rebuildList = true, { scroll = null, fade = true } = {}) {
   const p = page();
   clearSelection();
   hideFloatbars();
@@ -19,15 +21,20 @@ function loadPage(rebuildList = true) {
   editorPage = p;
   editorChanged = false;
   prepareBoxes();
-  // A short fade as the page changes.
   el.sheet.classList.remove('swap');
-  void el.sheet.offsetWidth;
-  el.sheet.classList.add('swap');
+  if (fade) {
+    void el.sheet.offsetWidth;
+    el.sheet.classList.add('swap');
+  }
   el.pageTitle.value = p.title;
-  el.workspace.scrollTop = 0;
+  if (!scroll) el.workspace.scrollTop = 0;
   applyPaper();
   if (p.mode === 'infinite') p.sheets = Math.min(MAX_INFINITE, contentSheets(p, el.editor));
   layoutSheets();
+  if (scroll) {
+    el.workspace.scrollTop = scroll.top;
+    el.workspace.scrollLeft = scroll.left;
+  }
   if (p.mode === 'infinite') ensureRoom(viewBottom());
   else growToFit();
   redrawInk();

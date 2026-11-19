@@ -257,6 +257,33 @@ group('undo and redo', async () => {
   undoKey();
   check('undo takes back a page title edit, even with the cursor in the title', await until(`!page().title.includes('renamed')`), await js('page().title'));
 
+  // Undo does not reload the page: the view stays put, the page is updated in place.
+  await js(`addPage(); extendPage(); extendPage(); setTool('pen'); 0`);
+  await js(`el.workspace.scrollTop = 1500; 0`);
+  await frame();
+  const view = await js(`(() => { const s = sheetScale(), ws = el.workspace.getBoundingClientRect(); return { top: el.workspace.scrollTop, y: Math.round((ws.top - s.rect.top) * s.k) }; })()`);
+  await drag(wave(view.y + 250));
+  await js(`window.__keep = el.editor; el.editor.dataset.marker = 'same'; el.sheet.classList.remove('swap'); 0`);
+  const scrolled = await js('el.workspace.scrollTop');
+  undoKey();
+  await until('page().strokes.length === 0');
+  check('undo keeps the view where it is', (await js('el.workspace.scrollTop')) === scrolled, `${scrolled} -> ${await js('el.workspace.scrollTop')}`);
+  check('undo does not reload the page', await js(`el.editor.dataset.marker === 'same' && !el.sheet.classList.contains('swap')`));
+  redoKey();
+  await until('page().strokes.length === 1');
+  check('redo keeps the view too', (await js('el.workspace.scrollTop')) === scrolled);
+  await js(`el.workspace.scrollTop = 0; 0`);
+  await frame();
+  undoKey();
+  await until('page().strokes.length === 0');
+  check('a change out of sight is scrolled into view', await js(`(() => { const s = sheetScale(), ws = el.workspace.getBoundingClientRect(); const top = (ws.top - s.rect.top) * s.k, bottom = (ws.bottom - s.rect.top) * s.k; return ${view.y + 220} >= top && ${view.y + 280} <= bottom; })()`));
+  redoKey();
+  await until('page().strokes.length === 1');
+  await js(`showPage(0); 0`);
+  undoKey();
+  check('undo on another page opens it at the change', await until(`page().strokes.length === 0 && el.workspace.scrollTop > 800`), await js('[state.pageIdx, el.workspace.scrollTop]'));
+  await js(`deletePage(state.pageIdx); 0`);
+
   // Redo is cleared by a new change; nothing to undo is harmless.
   undoKey();
   await frame();
