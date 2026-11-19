@@ -126,6 +126,7 @@ async function loadFile(file, dirty = false, pathOverride) {
     return false;
   }
   setNotebook(nb, pathOverride !== undefined ? pathOverride : file.path, dirty);
+  if (file.at) goToPlace(file.at);
   if (!dirty) touchRecent();
   if (state.tool === 'text') el.editor.focus();
   return true;

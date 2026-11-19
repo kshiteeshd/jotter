@@ -26,6 +26,9 @@
     } catch {}
     if (r === 0 && (await loadFile(boot.draft, true, typeof draftOf === 'string' ? draftOf : null))) return;
   }
+  // Otherwise pick up where you left off: the last notebook, at the same page and spot. Home is for when
+  // there is nothing to reopen.
+  if (boot.resume && (await loadFile(boot.resume))) return;
   renderHome(boot.recents);
   syncChrome();
 })();

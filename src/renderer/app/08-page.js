@@ -42,6 +42,7 @@ function loadPage(rebuildList = true, { scroll = null, fade = true } = {}) {
   if (rebuildList) renderPageList();
   else markActiveInList();
   syncChrome();
+  rememberPlace();
 }
 
 function applyPaper() {

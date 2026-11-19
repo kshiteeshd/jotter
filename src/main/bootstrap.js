@@ -130,6 +130,16 @@ function listNotebooks() {
 }
 const listRecents = listNotebooks;
 
+// Where you were in a notebook: the section, the page (by id) and how far down the page (in page units).
+function validPlace(at) {
+  if (!at || typeof at !== 'object') return null;
+  const sec = Number(at.sec);
+  const y = Number(at.y);
+  if (!Number.isInteger(sec) || sec < 0 || sec > 10000 || typeof at.page !== 'string' || !/^[\w-]{1,64}$/.test(at.page)) return null;
+  return { sec, page: at.page, y: Number.isFinite(y) ? Math.max(0, Math.min(1e6, Math.round(y))) : 0 };
+}
+const placeOf = (file) => (settings.recents.find((r) => samePath(r.path, file)) || {}).at || null;
+
 function touchRecent(entry) {
   if (!entry || typeof entry.path !== 'string') return;
   const old = settings.recents.find((r) => samePath(r.path, entry.path));
@@ -142,6 +152,7 @@ function touchRecent(entry) {
     lastOpened: Date.now(),
     pinned: !!(old && old.pinned),
     cover,
+    at: validPlace(entry.at) || (old && old.at) || null,
   };
   settings.recents = [next, ...settings.recents.filter((r) => !samePath(r.path, entry.path))];
   const pinned = settings.recents.filter((r) => r.pinned);
@@ -331,7 +342,7 @@ function toggleFullscreen(ctx, on) {
 
 function readForPage(file) {
   try {
-    return { path: file, ...format.readNotebook(file) };
+    return { path: file, at: placeOf(file), ...format.readNotebook(file) };
   } catch (err) {
     return { error: `Could not read the file.\n${err.message}` };
   }
@@ -356,15 +367,21 @@ function leftoverDrafts() {
 ipcMain.handle('app:ready', (e) => {
   const ctx = ctxOf(e);
   const { file, draft } = ctx.boot;
-  ctx.boot = {};
   let draftFile = null;
   if (draft) {
     const loaded = readForPage(draft);
     fs.rmSync(draft, { force: true }); // the page saves its own recovery copy from now on
     if (!loaded.error) draftFile = loaded;
   }
+  let resume = null;
+  if (ctx.boot.resume && !file && !draftFile) {
+    const last = [...settings.recents].sort((a, b) => b.lastOpened - a.lastOpened).find((r) => fs.existsSync(r.path) && !openElsewhere(ctx, r.path));
+    if (last) resume = readForPage(last.path);
+  }
+  ctx.boot = {};
   return {
     file: file ? readForPage(file) : null,
+    resume: resume && !resume.error ? resume : null,
     draft: draftFile,
     settings: publicSettings(),
     recents: listRecents(),
@@ -656,11 +673,12 @@ if (!app.requestSingleInstanceLock()) {
     buildMenu();
     const drafts = leftoverDrafts();
     if (drafts.length) drafts.forEach((draft, i) => createWindow({ draft, file: i === 0 ? initialPath : null }));
-    else createWindow({ file: initialPath });
+    else createWindow({ file: initialPath, resume: true });
     initialPath = null;
   });
 
   app.on('window-all-closed', () => app.quit());
 }
 
-
+// For the tests: open a window as at startup.
+module.exports = { createWindow };

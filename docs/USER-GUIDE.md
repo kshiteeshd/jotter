@@ -1,5 +1,9 @@
 # Jotter user guide
 
+## Opening Jotter
+
+Jotter opens where you left off: the last notebook you used, on the same page and scrolled to the same spot. Opening any notebook (from Home, or by double-clicking its file) also takes you back to where you were in it. Home appears when there is nothing to reopen, and in a new window.
+
 ## Home
 
 Home shows a greeting, one-click covers to start a new notebook, the notebook you were last in, and your shelf of notebooks (search it or sort by name). Every notebook lives in your notebooks folder, `Documents\Jotter` unless you change it at the bottom of Home or in Settings.

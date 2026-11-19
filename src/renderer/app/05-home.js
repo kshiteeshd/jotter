@@ -241,8 +241,48 @@ async function openRecent(r) {
 }
 
 function touchRecent() {
+  clearTimeout(placeTimer);
+  placeTimer = 0;
   if (!state.nb || !state.path) return;
-  api.touchRecent({ path: state.path, pages: totalPages(), cover: state.nb.cover });
+  api.touchRecent({ path: state.path, pages: totalPages(), cover: state.nb.cover, at: placeNow() });
+}
+
+// Where you are in the open notebook, so it reopens there: the section, the page and how far down.
+function placeNow() {
+  return { sec: state.secIdx, page: page().id, y: state.view === 'editor' ? Math.round(viewTop()) : 0 };
+}
+// Remember the place a moment after you move (a new page, scrolling), and when you leave. While you keep
+// moving it is saved at most every 0.8 s, so a long scroll can never put it off.
+let placeTimer = 0;
+function rememberPlace() {
+  if (placeTimer || !state.nb || !state.path || state.view !== 'editor') return;
+  placeTimer = setTimeout(touchRecent, 800);
+}
+el.workspace.addEventListener('scroll', rememberPlace, { passive: true });
+
+// Open a notebook at a remembered place.
+function goToPlace(at) {
+  if (!at || !state.nb) return;
+  let sec = -1;
+  let pg = -1;
+  state.nb.sections.forEach((s, si) => s.pages.forEach((p, pi) => p.id === at.page && ((sec = si), (pg = pi))));
+  if (sec < 0) return;
+  if (sec !== state.secIdx || pg !== state.pageIdx) {
+    state.secIdx = sec;
+    state.pageIdx = pg;
+    loadPage();
+    renderSidebar();
+  }
+  // Once the page has its size for this window (the zoom settles a frame later), scroll to the spot.
+  const y = Number(at.y) || 0;
+  const scroll = () => {
+    ensureRoom(y + H);
+    const s = sheetScale();
+    if (!s) return;
+    el.workspace.scrollTop += s.rect.top + y / s.k - el.workspace.getBoundingClientRect().top;
+  };
+  scroll();
+  requestAnimationFrame(() => requestAnimationFrame(scroll));
 }
 
 // The open page's row follows its title as you type.

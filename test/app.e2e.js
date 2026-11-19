@@ -478,6 +478,40 @@ group('saving and files', async () => {
   check('hostile files are cleaned on opening', await js(`!el.editor.innerHTML.includes('onerror') && !el.editor.innerHTML.includes('evil') && page().strokes.length === 1 && window.__p === undefined`));
 });
 
+group('reopening where you left off', async () => {
+  await fresh('Resume');
+  const file = path.join(library, 'Resume.ntb');
+  await js(`addPage(); addPage(); extendPage(); extendPage(); showPage(1); 0`);
+  await js(`el.workspace.scrollTop = 1400; 0`);
+  await sleep(1000); // the place is remembered a moment after you stop
+  const place = await js(`placeNow()`);
+  const saved = (await js('api.listRecents()')).find((r) => r.path === file)?.at;
+  equal('the place is remembered with the notebook', saved && [saved.page, saved.y], [place.page, place.y]);
+  await js(`(async () => { await leaveNotebook(); setNotebook(Model.newNotebook({ cover: 'kolam' }), null); })()`);
+  await js(`(async () => loadFile(await api.readNotebook(${JSON.stringify(file)})))()`);
+  await sleep(100);
+  check('reopening a notebook opens the same page', (await js('page().id')) === place.page, await js('page().title'));
+  check('…scrolled to the same spot', Math.abs((await js('Math.round(viewTop())')) - place.y) <= 8, `${await js('Math.round(viewTop())')} vs ${place.y}`);
+  // Starting the app: the first window reopens the last notebook instead of showing Home.
+  await js(`(async () => { await leaveNotebook(); state.nb = null; state.path = null; syncChrome(); })()`);
+  await sleep(100);
+  const before = new Set(BrowserWindow.getAllWindows());
+  require('../src/main/bootstrap').createWindow({ resume: true });
+  const fresh2 = BrowserWindow.getAllWindows().find((w) => !before.has(w));
+  fresh2.setPosition(-20000, -20000);
+  fresh2.webContents.setBackgroundThrottling(false);
+  const js2 = (code) => fresh2.webContents.executeJavaScript(code, true);
+  let opened = false;
+  for (let i = 0; i < 100 && !opened; i++) {
+    await sleep(50);
+    opened = await js2(`typeof state !== 'undefined' && state.view === 'editor' && !!state.nb`).catch(() => false);
+  }
+  await sleep(150);
+  check('starting Jotter opens the last notebook, not Home', opened && (await js2('notebookName()')) === 'Resume');
+  check('…on the page and spot where you left off', opened && (await js2('page().id')) === place.page && Math.abs((await js2('Math.round(viewTop())')) - place.y) <= 8);
+  fresh2.destroy();
+});
+
 group('export', async () => {
   await fresh('Export');
   await typeText('Export me');
@@ -645,6 +679,7 @@ app.whenReady().then(async () => {
   // Off-screen, so the real mouse (someone using the PC while the tests run) never mixes with the test's
   // input; the window still renders normally there.
   win.setPosition(-20000, -20000);
+  wc.setBackgroundThrottling(false); // off-screen windows would otherwise run their timers late
   wc.on('console-message', (e) => /error|Uncaught/i.test(e.message) && !/Content Security Policy/.test(e.message) && report(false, 'no script errors', `${e.message} at ${String(e.sourceId || '').split('/').pop()}:${e.lineNumber}`));
   await new Promise((r) => (wc.isLoading() ? wc.once('did-finish-load', r) : r()));
   await until('typeof run === "function" && state.version');
