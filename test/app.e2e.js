@@ -440,6 +440,43 @@ group('search', async () => {
   check('and highlights the match', await js(`!!CSS.highlights.get('search')`));
 });
 
+group('performance with a heavy notebook', async () => {
+  await fresh('Heavy');
+  // 20 pages of dense handwriting and a large picture.
+  await js(`(() => {
+    let seed = 7; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const c = document.createElement('canvas'); c.width = 500; c.height = 500; const g = c.getContext('2d');
+    const img = g.createImageData(500, 500); for (let i = 0; i < img.data.length; i++) img.data[i] = (r() * 255) | 0; g.putImageData(img, 0, 0);
+    const pic = c.toDataURL('image/png');
+    const sec = state.nb.sections[0]; sec.pages.length = 0;
+    for (let p = 0; p < 20; p++) {
+      const page = Model.newPage('Page ' + (p + 1));
+      for (let s = 0; s < 300; s++) { const pts = []; let x = 60 + r() * 600, y = 60 + r() * 1000; for (let k = 0; k < 100; k++) { x += r() * 3 - 1.5; y += r() * 3 - 1.5; pts.push(Math.round(x), Math.round(y)); } page.strokes.push({ tool: 'pen', color: '#1f1b18', size: 3, points: pts }); }
+      page.html = '<div>Notes</div>' + (p === 0 ? '<img src="' + pic + '">' : '');
+      sec.pages.push(page);
+    }
+    state.pageIdx = 0; loadPage(); renderSidebar(); resetHistory(); markDirty(null);
+  })()`);
+  await js('saveNotebook(false, true)');
+  // While autosave runs, the main process (which passes pen and keyboard input to the page) must not stall.
+  let last = Date.now();
+  let worst = 0;
+  const tick = setInterval(() => { const n = Date.now(); worst = Math.max(worst, n - last - 5); last = n; }, 5);
+  const took = [];
+  for (let i = 0; i < 3; i++) {
+    const t = Date.now();
+    await js(`(async () => { el.editor.focus(); document.execCommand('insertText', false, ' more'); page().strokes = [...page().strokes]; markDirty(); await saveNotebook(false, true); })()`);
+    took.push(Date.now() - t);
+  }
+  clearInterval(tick);
+  check('autosave of a heavy notebook is quick', Math.max(...took) < 400, `${took.join(', ')} ms`);
+  check('autosave never freezes input', worst < 120, `main thread stalled ${worst} ms`);
+  const prep = await js(`(() => { page().rev++; const t = performance.now(); Model.buildSave(state.nb, sent); return performance.now() - t; })()`);
+  check('preparing a save of a page with a large picture is quick', prep < 40, `${Math.round(prep)} ms`);
+  const undoTime = await js(`(() => { page().strokes = page().strokes.slice(1); markDirty(); const t = performance.now(); undo(); return performance.now() - t; })()`);
+  check('undo on a heavy notebook is quick', undoTime < 100, `${Math.round(undoTime)} ms`);
+});
+
 group('layout at every size and edge', async () => {
   await fresh('Layout');
   await js(`setTool('pen'); 0`);

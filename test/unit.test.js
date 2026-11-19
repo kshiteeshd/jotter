@@ -26,6 +26,29 @@ test('notebook files round-trip, with images stored as binary', () => {
   assert.equal(read.v3.assets['assets/abc.png'], `data:image/png;base64,${png.toString('base64')}`);
 });
 
+test('the notebook writer makes standard zip files that reuse unchanged pages', async () => {
+  const file = path.join(tmp, 'fast.ntb');
+  const page = Buffer.from(JSON.stringify({ title: 'Ünïcode ✓', strokes: Array.from({ length: 2000 }, (_, i) => i) }));
+  const pic = Buffer.from('89504e470d0a1a0a', 'hex');
+  const entries = new Map([['notebook.json', Buffer.from('{"version":3}')], ['pages/a.json', page], ['assets/x.png', pic]]);
+  await format.writeNotebookAsync(file, entries);
+  const read = format.readNotebook(file);
+  assert.equal(read.v3.pages['pages/a.json'], page.toString('utf8'));
+  assert.equal(read.v3.assets['assets/x.png'], `data:image/png;base64,${pic.toString('base64')}`);
+  // Same buffers again: nothing is compressed a second time, so it is quick even for big pages.
+  const big = Buffer.alloc(8e6, 'x');
+  entries.set('pages/b.json', big);
+  await format.writeNotebookAsync(file, entries);
+  const t = process.hrtime.bigint();
+  await format.writeNotebookAsync(file, entries);
+  assert.ok(Number(process.hrtime.bigint() - t) / 1e6 < 200, 'unchanged pages are not compressed again');
+  // Saves to one file land in the order they were made.
+  const last = new Map([['notebook.json', Buffer.from('{"version":3,"n":2}')]]);
+  await Promise.all([format.writeNotebookAsync(file, new Map([['notebook.json', Buffer.from('{"version":3,"n":1}')]])), format.writeNotebookAsync(file, last)]);
+  assert.equal(JSON.parse(format.readNotebook(file).v3.notebook).n, 2);
+  assert.deepEqual(fs.readdirSync(tmp).filter((f) => f.endsWith('.tmp')), []);
+});
+
 test('old JSON notebooks are read as text', () => {
   const file = path.join(tmp, 'old.ntb');
   fs.writeFileSync(file, '{"format":"jotter-notebook","pages":[]}');

@@ -546,7 +546,7 @@ ipcMain.handle('notebook:save', async (e, req) => {
   if (req.draft) {
     try {
       fs.mkdirSync(draftsDir(), { recursive: true });
-      format.writeNotebook(draftPath(ctx), entries);
+      await format.writeNotebookAsync(draftPath(ctx), entries);
       return { path: req.path || null };
     } catch (err) {
       return { error: `Could not write the recovery copy.\n${err.message}` };
@@ -564,7 +564,7 @@ ipcMain.handle('notebook:save', async (e, req) => {
     if (!/\.ntb$/i.test(copy)) copy += '.ntb';
     if (samePath(copy, ctx.path) || openElsewhere(ctx, copy)) return { error: 'Choose a different name for the copy.' };
     try {
-      format.writeNotebook(copy, entries);
+      await format.writeNotebookAsync(copy, entries);
       return { path: req.path, copy };
     } catch (err) {
       return { error: `Could not save the copy.\n${err.message}` };
@@ -590,7 +590,7 @@ ipcMain.handle('notebook:save', async (e, req) => {
       format.snapshot(userDir('history'), target, settings.historyLimit);
       ctx.snapshots.set(key, Date.now());
     }
-    format.writeNotebook(target, entries);
+    await format.writeNotebookAsync(target, entries);
     ctx.path = target;
     return { path: target };
   } catch (err) {

@@ -14,7 +14,11 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { zipSync, unzipSync } = require('fflate');
+const zlib = require('zlib');
+const { promisify } = require('util');
+const { unzipSync } = require('fflate');
+
+const deflateRaw = promisify(zlib.deflateRaw);
 
 const MAX_UNZIPPED = 1024 * 1024 * 1024; // refuse archives that expand beyond 1 GB
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
@@ -79,10 +83,99 @@ function peekNotebook(file) {
 }
 
 // entries: Map of name -> Uint8Array. Text is compressed; images are stored as they are.
+/*
+  Writing notebooks. Saving happens every time you pause, so it must stay cheap however big the notebook
+  grows: each entry is compressed once and remembered by its content buffer (the main process reuses the
+  buffer of every page that has not changed), and the compressing and the disk write happen off the main
+  thread, which is also the thread that passes your pen and keyboard input to the page.
+*/
+const packed = new WeakMap(); // content buffer -> { method, body, crc, size }
+
+function packWith(name, data, body) {
+  const p = { method: body === data ? 0 : 8, body, crc: zlib.crc32(data), size: data.length };
+  packed.set(data, p);
+  return p;
+}
+const storeOnly = (name) => name.startsWith('assets/'); // pictures are compressed already
+
+function packSync(name, data) {
+  return packed.get(data) || packWith(name, data, storeOnly(name) ? data : zlib.deflateRawSync(data, { level: 6 }));
+}
+async function pack(name, data) {
+  return packed.get(data) || packWith(name, data, storeOnly(name) ? data : await deflateRaw(data, { level: 6 }));
+}
+
+// A standard zip archive (readable by any zip tool) from packed entries.
+function zipFrom(list) {
+  const now = new Date();
+  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const date = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  for (const [name, p] of list) {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0x0800, 6); // names are UTF-8
+    local.writeUInt16LE(p.method, 8);
+    local.writeUInt16LE(time, 10);
+    local.writeUInt16LE(date, 12);
+    local.writeUInt32LE(p.crc >>> 0, 14);
+    local.writeUInt32LE(p.body.length, 18);
+    local.writeUInt32LE(p.size, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    const dir = Buffer.alloc(46);
+    dir.writeUInt32LE(0x02014b50, 0);
+    dir.writeUInt16LE(20, 4);
+    dir.writeUInt16LE(20, 6);
+    dir.writeUInt16LE(0x0800, 8);
+    dir.writeUInt16LE(p.method, 10);
+    dir.writeUInt16LE(time, 12);
+    dir.writeUInt16LE(date, 14);
+    dir.writeUInt32LE(p.crc >>> 0, 16);
+    dir.writeUInt32LE(p.body.length, 20);
+    dir.writeUInt32LE(p.size, 24);
+    dir.writeUInt16LE(nameBuf.length, 28);
+    dir.writeUInt32LE(offset, 42);
+    parts.push(local, nameBuf, p.body);
+    central.push(dir, nameBuf);
+    offset += 30 + nameBuf.length + p.body.length;
+  }
+  const dirSize = central.reduce((n, b) => n + b.length, 0);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(list.length, 8);
+  end.writeUInt16LE(list.length, 10);
+  end.writeUInt32LE(dirSize, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...parts, ...central, end]);
+}
+
 function writeNotebook(file, entries) {
-  const input = {};
-  for (const [name, data] of entries) input[name] = [data, { level: name.startsWith('assets/') ? 0 : 6 }];
-  writeFileAtomic(file, zipSync(input));
+  writeFileAtomic(file, zipFrom([...entries].map(([name, data]) => [name, packSync(name, data)])));
+}
+
+// Saves to the same file run one after another, so an older save can never land after a newer one.
+const queues = new Map();
+function writeNotebookAsync(file, entries) {
+  const key = path.resolve(file).toLowerCase();
+  const run = (queues.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
+    const list = [];
+    for (const [name, data] of entries) list.push([name, await pack(name, data)]);
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    await fs.promises.writeFile(tmp, zipFrom(list));
+    try {
+      await fs.promises.rename(tmp, file);
+    } catch (err) {
+      await fs.promises.rm(tmp, { force: true });
+      throw err;
+    }
+  });
+  queues.set(key, run);
+  run.finally(() => queues.get(key) === run && queues.delete(key)).catch(() => {});
+  return run;
 }
 
 // ---------- Version history ----------
@@ -115,4 +208,4 @@ function historyFile(root, file, id) {
   return path.join(historyDir(root, file), id);
 }
 
-module.exports = { readNotebook, peekNotebook, writeNotebook, writeFileAtomic, snapshot, listHistory, historyFile, isZip };
+module.exports = { readNotebook, peekNotebook, writeNotebook, writeNotebookAsync, writeFileAtomic, snapshot, listHistory, historyFile, isZip };

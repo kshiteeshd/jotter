@@ -205,16 +205,43 @@
 
   const pageCache = new WeakMap(); // page -> { key, json, assets }
 
+  /*
+    Pictures live inside a page's text as base64. Saving stores each one once, named by a fingerprint of
+    its data. Fingerprints are remembered (a picture is several MB of text, and saving happens every time
+    you pause), and so is the stored form of a page's text, which stays the same while only its ink changes.
+  */
+  const assetNames = new Map(); // picture data -> file name
+  const htmlForms = new Map(); // page text -> { html, assets }
+  function assetName(b64, ext) {
+    let name = assetNames.get(b64);
+    if (!name) {
+      if (assetNames.size > 400) assetNames.clear();
+      name = `assets/${hashName(b64)}.${ext === 'jpeg' ? 'jpg' : ext}`;
+      assetNames.set(b64, name);
+    }
+    return name;
+  }
+  function storedHtml(source) {
+    let form = htmlForms.get(source);
+    if (!form) {
+      const assets = [];
+      const html = source.replace(/src="data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"/g, (_m, ext, b64) => {
+        const name = assetName(b64, ext);
+        assets.push({ name, data: b64 });
+        return `src="asset:${name}"`;
+      });
+      if (htmlForms.size > 60) htmlForms.clear();
+      form = { html, assets };
+      htmlForms.set(source, form);
+    }
+    return form;
+  }
+
   function serializePage(p) {
     const key = `${p.rev}:${p.sheets}`;
     const hit = pageCache.get(p);
     if (hit && hit.key === key) return hit;
-    const assets = [];
-    const html = p.html.replace(/src="data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"/g, (_m, ext, b64) => {
-      const name = `assets/${hashName(b64)}.${ext === 'jpeg' ? 'jpg' : ext}`;
-      assets.push({ name, data: b64 });
-      return `src="asset:${name}"`;
-    });
+    const { html, assets } = storedHtml(p.html);
     const { id, title, mode, paper, sheets, strokes } = p;
     const entry = { key, json: JSON.stringify({ id, title, mode, paper, sheets, html, strokes }), assets };
     pageCache.set(p, entry);
