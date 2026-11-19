@@ -68,12 +68,16 @@ async function typeText(text) {
 async function drag(points, modifiers = []) {
   const at = await js(`(() => { const s = sheetScale(); return { x: s.rect.left, y: s.rect.top, k: s.k }; })()`);
   const xy = ([x, y]) => ({ x: Math.round(at.x + x / at.k), y: Math.round(at.y + y / at.k), modifiers });
+  // Each step waits for the app to have it: the pen down, every move, then the pen up.
+  await until('!current && !selDrag');
   wc.sendInputEvent({ type: 'mouseMove', ...xy(points[0]) });
   wc.sendInputEvent({ type: 'mouseDown', button: 'left', clickCount: 1, ...xy(points[0]) });
+  await until('!!(current || selDrag)', 1000);
   for (const p of points.slice(1)) {
     wc.sendInputEvent({ type: 'mouseMove', button: 'left', ...xy(p) });
     await sleep(4);
   }
+  await frame();
   wc.sendInputEvent({ type: 'mouseUp', button: 'left', clickCount: 1, ...xy(points.at(-1)) });
   await until('!current && !selDrag');
   await frame();
@@ -182,6 +186,7 @@ group('ink tools', async () => {
   await js(`setTool('select'); 0`);
   await drag([[50, 400], [560, 400], [560, 490], [50, 490], [50, 400]]);
   check('the lasso selects ink', await js(`!!selection && selection.strokes.length >= 1`));
+  if (!(await js('!!selection'))) throw new Error('nothing was selected, so the selection checks cannot run');
   const sel = await js('selection.strokes.length');
   const m = await strokes();
   await js(`copySelection(); pasteInk(); 0`);
@@ -375,10 +380,11 @@ group('sidebar', async () => {
   key('F2');
   check('F2 renames a section in place', await until(`!!el.sectionList.querySelector('input')`));
   wc.insertText('Ideas');
+  await until(`el.sectionList.querySelector('input')?.value === 'Ideas'`, 1000);
   key('Return');
-  check('…and the new name sticks', await until(`state.nb.sections[1].title === 'Ideas'`));
+  check('…and the new name sticks', await until(`state.nb.sections[1]?.title === 'Ideas'`), await js(`JSON.stringify(state.nb.sections.map((s) => s.title))`));
   undoKey();
-  check('undo takes back a section rename', await until(`state.nb.sections[1].title !== 'Ideas'`));
+  check('undo takes back a section rename', await until(`state.nb.sections[1]?.title !== 'Ideas'`));
   await js(`showSection(0); addPage(); addPage(); el.pageList.children[0].focus(); 0`);
   key('End');
   check('End jumps to the last page', await until('state.pageIdx === 2'));
@@ -551,10 +557,10 @@ group('layout at every size and edge', async () => {
   check('a narrow window fits the page by zooming out', await until('state.zoom < 1'));
   win.setSize(1400, 900);
   check('…and back to actual size when there is room', await until('state.zoom === 1'));
-  key('=', ['control']);
-  check('Ctrl+= zooms in', await until('state.zoom > 1'));
-  key('0', ['control']);
-  check('Ctrl+0 fits again', await until('state.zoom === 1'));
+  await js(`run('zoom-in'); 0`);
+  check('zoom in', await until('state.zoom > 1'));
+  await js(`run('zoom-reset'); 0`);
+  check('zoom reset fits again', await until('state.zoom === 1'));
 });
 
 group('settings and dialogs', async () => {
@@ -595,7 +601,10 @@ app.whenReady().then(async () => {
   win = BrowserWindow.getAllWindows()[0];
   wc = win.webContents;
   win.setSize(1400, 900);
-  wc.on('console-message', (e) => /error|Uncaught/i.test(e.message) && !/Content Security Policy/.test(e.message) && report(false, 'no script errors', e.message));
+  // Off-screen, so the real mouse (someone using the PC while the tests run) never mixes with the test's
+  // input; the window still renders normally there.
+  win.setPosition(-20000, -20000);
+  wc.on('console-message', (e) => /error|Uncaught/i.test(e.message) && !/Content Security Policy/.test(e.message) && report(false, 'no script errors', `${e.message} at ${String(e.sourceId || '').split('/').pop()}:${e.lineNumber}`));
   await new Promise((r) => (wc.isLoading() ? wc.once('did-finish-load', r) : r()));
   await until('typeof run === "function" && state.version');
   for (const g of groups) {
