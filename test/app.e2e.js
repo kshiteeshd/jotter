@@ -219,6 +219,22 @@ group('ink tools', async () => {
   check('[ goes one gradual step down', down < s3 && s3 / down < 1.2, `${s3} -> ${down}`);
   await js(`el.size.value = 0; el.size.dispatchEvent(new Event('input')); 0`);
   equal('the slider starts at the thinnest size', await js('state.tools.pen.size'), 0.4);
+  // The pen's nib (the pointer on the page) stays steady while writing with a tablet.
+  await js(`setTool('pen'); 0`);
+  const nib = (code) => js(`(() => {
+    const r = el.workspace.getBoundingClientRect();
+    const at = (x, y, extra = {}) => ({ clientX: r.left + x, clientY: r.top + y, pointerId: 7, pointerType: 'pen', bubbles: true, ...extra });
+    const send = (type, init) => el.inkLayer.dispatchEvent(new PointerEvent(type, init));
+    ${code};
+    return getComputedStyle(el.ring).display !== 'none';
+  })()`);
+  check('the nib shows while the pen hovers', await nib(`send('pointermove', at(300, 300))`));
+  check('lifting the pen out of the tablet\'s range keeps the nib in place', await nib(`send('pointerleave', at(300, 300))`));
+  check('another contact leaving (a palm) does not hide the pen\'s nib', await nib(`send('pointermove', at(300, 300)); send('pointerleave', at(320, 320, { pointerId: 9, pointerType: 'touch' }))`));
+  check('moving the pen off the page hides the nib', !(await nib(`send('pointerleave', at(-200, 300))`)));
+  check('the nib appears the moment the pen touches down', await nib(`send('pointerdown', at(310, 310, { button: 0, buttons: 1 })); send('pointerup', at(310, 310))`));
+  await until('!current');
+  await js(`hideRing(); 0`);
   const dots = await js(`[...document.querySelectorAll('#size-presets .preset i')].map((i) => i.offsetWidth)`);
   check('the size buttons grow evenly, none alike', dots.every((d, i) => i === 0 || d > dots[i - 1]), dots.join(' '));
 });

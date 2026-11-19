@@ -40,7 +40,7 @@ document.addEventListener('keydown', (e) => {
     if (!spaceDown) {
       spaceDown = true;
       document.body.classList.add('panning');
-      el.ring.style.display = 'none';
+      hideRing();
     }
     return;
   }

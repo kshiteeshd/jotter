@@ -194,11 +194,12 @@ el.inkLayer.addEventListener('pointerdown', (e) => {
   if (state.tool === 'text' || current || pan || selDrag) return;
   if (e.pointerType === 'pen') lastPen = Date.now();
   if (e.pointerType === 'touch' && (state.settings.penOnly || Date.now() - lastPen < 800)) return;
+  moveRing(e); // the nib is there the moment the pen touches, even without hovering first
   if (spaceDown || e.button === 1) {
     e.preventDefault();
     pan = { id: e.pointerId, x: e.clientX, y: e.clientY, left: el.workspace.scrollLeft, top: el.workspace.scrollTop };
     document.body.classList.add('panning', 'dragging');
-    el.ring.style.display = 'none';
+    hideRing();
     capture(e);
     return;
   }
@@ -302,7 +303,14 @@ el.inkLayer.addEventListener('pointercancel', finishGesture);
 window.addEventListener('pointerup', finishGesture);
 window.addEventListener('pointercancel', finishGesture);
 el.inkLayer.addEventListener('pointerenter', moveRing);
-el.inkLayer.addEventListener('pointerleave', () => (el.ring.style.display = 'none'));
+el.inkLayer.addEventListener('pointerleave', (e) => {
+  if (ringPointer !== null && e.pointerId !== ringPointer) return; // another contact (say, a resting palm) left
+  // A pen lifted out of the tablet's range "leaves" the page too, between every word. Its nib stays where
+  // it was instead of blinking off; it goes only when the pen really moves off the page.
+  if (e.pointerType === 'pen' && insidePage(e.clientX, e.clientY)) return;
+  hideRing();
+});
+window.addEventListener('blur', hideRing);
 // Stop the middle mouse button from starting the browser's own auto-scroll; it pans the page instead.
 el.inkLayer.addEventListener('mousedown', (e) => {
   if (e.button === 1) e.preventDefault();
@@ -310,6 +318,18 @@ el.inkLayer.addEventListener('mousedown', (e) => {
 
 // Drawing tools show their nib instead of the system pointer: a dot of the pen's colour and size,
 // a translucent marker tip, or the outline of the eraser.
+// The nib follows one pointer at a time: the one that last moved over the page.
+let ringPointer = null;
+function hideRing() {
+  el.ring.style.display = 'none';
+  ringPointer = null;
+}
+function insidePage(x, y) {
+  const a = el.inkLayer.getBoundingClientRect();
+  const b = el.workspace.getBoundingClientRect();
+  return x > Math.max(a.left, b.left) && x < Math.min(a.right, b.right) && y > Math.max(a.top, b.top) && y < Math.min(a.bottom, b.bottom);
+}
+
 function moveRing(e) {
   const tool = state.tool;
   if (!['pen', 'marker', 'eraser'].includes(tool) || spaceDown || e.pointerType === 'touch') return;
@@ -321,6 +341,7 @@ function moveRing(e) {
   const st = el.ring.style;
   el.ring.dataset.tool = tool;
   if (t.color) st.setProperty('--ring', t.color);
+  ringPointer = e.pointerId;
   st.display = 'block';
   st.width = st.height = `${d}px`;
   st.transform = `translate(${e.clientX - d / 2}px, ${e.clientY - d / 2}px)`;

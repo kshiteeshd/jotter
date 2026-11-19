@@ -8,7 +8,7 @@ function setTool(tool) {
     b.classList.toggle('active', b.dataset.tool === tool);
     b.setAttribute('aria-checked', String(b.dataset.tool === tool));
   });
-  el.ring.style.display = 'none';
+  hideRing();
   if (tool === 'text') {
     if (state.view === 'editor') el.editor.focus();
   } else {
