@@ -193,9 +193,34 @@ group('ink tools', async () => {
   equal('copy and paste', await strokes(), m + sel);
   await js(`deleteSelection(); 0`);
   equal('delete the selection', await strokes(), m);
+  // Sizes are gradual: each step draws a line about 12% thicker than the one before.
+  const ink = await js(`(() => {
+    const cfg = SIZE_CONFIG.pen;
+    const c = document.createElement('canvas'); c.width = 900; c.height = 120;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    return cfg.steps.map((size) => {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, 900, 120); g.setTransform(2, 0, 0, 2, 0, 0);
+      const pts = []; for (let i = 0; i <= 80; i++) pts.push(20 + i * 5, 30);
+      Ink.drawStroke(g, { tool: 'pen', color: '#000000', size, points: pts, taper: 1 });
+      const d = g.getImageData(0, 0, 900, 120).data; let a = 0; for (let i = 3; i < d.length; i += 4) a += d[i];
+      return a;
+    });
+  })()`);
+  const jumps = ink.slice(1).map((v, i) => v / ink[i]);
+  check('each pen size step draws a gradually thicker line', jumps.every((r) => r > 1.04 && r < 1.25), jumps.map((r) => r.toFixed(2)).join(' '));
   await js(`setTool('pen'); setSize(3); 0`);
+  const s3 = await js('state.tools.pen.size');
   key(']');
-  check('] makes the pen larger', (await js('state.tools.pen.size')) > 3);
+  const up = await js('state.tools.pen.size');
+  check('] goes one gradual step up', up > s3 && up / s3 < 1.2, `${s3} -> ${up}`);
+  key('[');
+  key('[');
+  const down = await js('state.tools.pen.size');
+  check('[ goes one gradual step down', down < s3 && s3 / down < 1.2, `${s3} -> ${down}`);
+  await js(`el.size.value = 0; el.size.dispatchEvent(new Event('input')); 0`);
+  equal('the slider starts at the thinnest size', await js('state.tools.pen.size'), 0.4);
+  const dots = await js(`[...document.querySelectorAll('#size-presets .preset i')].map((i) => i.offsetWidth)`);
+  check('the size buttons grow evenly, none alike', dots.every((d, i) => i === 0 || d > dots[i - 1]), dots.join(' '));
 });
 
 group('undo and redo', async () => {

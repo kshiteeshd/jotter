@@ -49,9 +49,7 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     setTool(tool);
   } else if (e.key === '[' || e.key === ']') {
-    const cfg = SIZE_CONFIG[state.tool];
-    const step = cfg ? cfg.step : 1;
-    setSize((state.tools[state.tool].size || 0) + (e.key === ']' ? step : -step));
+    stepSize(e.key === ']' ? 1 : -1);
   }
 });
 document.addEventListener('keyup', (e) => {

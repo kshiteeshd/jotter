@@ -14,18 +14,48 @@ function setTool(tool) {
   } else {
     el.editor.blur();
     window.getSelection().removeAllRanges();
-    if (state.tools[tool].size) el.size.value = state.tools[tool].size;
   }
   syncToolUi();
 }
 
+/*
+  Sizes go up in even steps of thickness, not of number: each step is about 12% thicker than the one before,
+  so every step looks like the same change whether the line is thin or thick. The steps are the standard
+  "preferred numbers" (Renard R20): 1, 1.12, 1.25, 1.4, 1.6, 1.8, 2, 2.24, 2.5 … The slider, the [ and ] keys
+  and the size buttons all move along them.
+*/
+const R20 = [1, 1.12, 1.25, 1.4, 1.6, 1.8, 2, 2.24, 2.5, 2.8, 3.15, 3.55, 4, 4.5, 5, 5.6, 6.3, 7.1, 8, 9];
+function gradual(min, max) {
+  const out = [];
+  for (let decade = 0.1; decade <= max; decade *= 10) {
+    for (const r of R20) {
+      const v = Math.round(r * decade * 1000) / 1000;
+      if (v >= min - 1e-9 && v <= max + 1e-9) out.push(v);
+    }
+  }
+  return out;
+}
+function sizeConfig(min, max) {
+  const steps = gradual(min, max);
+  // Eight buttons spread evenly along the steps.
+  const presets = Array.from({ length: 8 }, (_, i) => steps[Math.round((i * (steps.length - 1)) / 7)]);
+  return { min, max, steps, presets };
+}
 const SIZE_CONFIG = {
-  pen: { min: 0.5, max: 16, step: 0.5, presets: [1, 1.5, 2, 3, 4, 6, 8, 12] },
-  marker: { min: 4, max: 40, step: 1, presets: [6, 10, 14, 18, 24, 32] },
-  eraser: { min: 4, max: 80, step: 1, presets: [8, 16, 24, 32, 48, 64] },
-  shape: { min: 0.5, max: 12, step: 0.5, presets: [1, 2, 3, 4, 6, 8] },
+  pen: sizeConfig(0.4, 16),
+  marker: sizeConfig(4, 40),
+  eraser: sizeConfig(4, 80),
+  shape: sizeConfig(0.4, 12.5),
 };
-const formatSize = (n) => (Math.round(n * 10) / 10).toString();
+const formatSize = (n) => (Math.round(n * 100) / 100).toString();
+// The step nearest to a size (nearest in thickness, so 0.5 is nearer 0.45 than 0.6).
+function stepIndex(cfg, size) {
+  let best = 0;
+  cfg.steps.forEach((v, i) => Math.abs(Math.log(v / size)) < Math.abs(Math.log(cfg.steps[best] / size)) && (best = i));
+  return best;
+}
+// How big to draw a size in the bar: evenly growing dots, from `small` to `large` pixels.
+const dotFor = (cfg, v, small, large) => Math.round(small + ((large - small) * Math.log(v / cfg.min)) / Math.log(cfg.max / cfg.min));
 let presetsTool = '';
 
 function renderSizePresets(tool) {
@@ -42,7 +72,7 @@ function renderSizePresets(tool) {
       b.title = `${formatSize(v)} px`;
       b.setAttribute('aria-label', `${formatSize(v)} px`);
       const i = document.createElement('i');
-      const d = Math.max(4, Math.min(18, Math.round(v * 0.9)));
+      const d = dotFor(cfg, v, 3, 16);
       i.style.width = i.style.height = `${d}px`;
       b.append(i);
       box.append(b);
@@ -50,21 +80,22 @@ function renderSizePresets(tool) {
     presetsTool = tool;
   }
   const cur = state.tools[tool].size;
-  box.querySelectorAll('.preset').forEach((b) => b.setAttribute('aria-pressed', String(Math.abs(Number(b.dataset.value) - cur) < 0.01)));
+  box.querySelectorAll('.preset').forEach((b) => b.setAttribute('aria-pressed', String(Math.abs(Number(b.dataset.value) - cur) < 0.001)));
 }
 
 function syncToolUi() {
   const t = state.tools[state.tool];
   const cfg = SIZE_CONFIG[state.tool];
   if (t.size && cfg) {
-    if (el.size.min !== String(cfg.min)) {
-      el.size.min = cfg.min;
-      el.size.max = cfg.max;
-      el.size.step = cfg.step;
+    const max = String(cfg.steps.length - 1);
+    if (el.size.max !== max) {
+      el.size.min = 0;
+      el.size.max = max;
+      el.size.step = 1;
     }
-    el.size.value = t.size;
+    el.size.value = stepIndex(cfg, t.size);
     el.sizeValue.textContent = formatSize(t.size);
-    const d = Math.min(26, Math.max(2, t.size));
+    const d = dotFor(cfg, t.size, 2, 26);
     el.sizeDot.style.width = el.sizeDot.style.height = `${d}px`;
     el.sizeDot.style.background = state.tool === 'eraser' ? '' : t.color;
     el.sizeDot.style.opacity = state.tool === 'marker' ? 0.6 : 1;
@@ -77,15 +108,21 @@ function syncToolUi() {
   setSeg('shape-kind', state.tools.shape.kind);
 }
 
+// Set the size to the step nearest `size`.
 function setSize(size) {
   const t = state.tools[state.tool];
   const cfg = SIZE_CONFIG[state.tool];
-  if (!t || !cfg) return;
-  const step = cfg.step || 1;
-  const snapped = Math.round(Number(size) / step) * step;
-  t.size = Math.min(cfg.max, Math.max(cfg.min, Math.round(snapped * 100) / 100));
-  if (el.size) el.size.value = t.size;
+  if (!t || !cfg || !(size > 0)) return;
+  t.size = cfg.steps[stepIndex(cfg, size)];
   syncToolUi();
+}
+
+// One step thicker (+1) or thinner (-1): the [ and ] keys.
+function stepSize(dir) {
+  const cfg = SIZE_CONFIG[state.tool];
+  if (!cfg) return;
+  const i = Math.min(cfg.steps.length - 1, Math.max(0, stepIndex(cfg, state.tools[state.tool].size) + dir));
+  setSize(cfg.steps[i]);
 }
 
 function setColor(color) {
@@ -108,7 +145,10 @@ $('sel-swatches').addEventListener('click', (e) => {
   if (e.target.dataset.color) recolorSelection(e.target.dataset.color);
 });
 el.customColor.addEventListener('input', () => setColor(el.customColor.value));
-el.size.addEventListener('input', () => setSize(Number(el.size.value)));
+el.size.addEventListener('input', () => {
+  const cfg = SIZE_CONFIG[state.tool];
+  if (cfg) setSize(cfg.steps[Number(el.size.value)]);
+});
 $('size-presets').addEventListener('click', (e) => {
   const b = e.target.closest('[data-value]');
   if (b) setSize(Number(b.dataset.value));

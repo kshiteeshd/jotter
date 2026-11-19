@@ -130,48 +130,119 @@
     return [r1(x / 16), r1(y / 16)];
   }
 
-  // Pressure strokes are drawn as runs of pieces that share a width (rounded to a quarter unit), which keeps
-  // the number of drawing calls low even for long strokes.
-  function pressureRuns(s) {
-    const runs = [];
+  /*
+    Strokes whose width varies (pen pressure, tapered ends) are drawn as one filled outline: the smoothed
+    centre line is sampled, offset to both sides by half the width there, and closed with round ends. One
+    shape per stroke keeps the width changes smooth and never darkens where pieces would overlap.
+  */
+  const cap = (x, y, nx, ny, tx, ty, h, from, out) => {
+    for (let k = 1; k < 8; k++) {
+      const a = from + (Math.PI * k) / 8;
+      out.push(x + h * (nx * Math.cos(a) + tx * Math.sin(a)), y + h * (ny * Math.cos(a) + ty * Math.sin(a)));
+    }
+  };
+  function outlineD(s, grow = 1) {
+    const p = s.points;
+    const n = p.length / 2;
     const pw = widths(s);
-    let cur = null;
-    for (let i = 0; i < pw.length; i++) {
-      const w = Math.max(0.25, Math.round(pressureWidth(s.size, pw[i]) * 4) / 4);
-      const [sx, sy, cx, cy, ex, ey] = segment(s.points, i);
-      if (!cur || cur.w !== w) {
-        cur = { w, d: `M${r1(sx)} ${r1(sy)}` };
-        runs.push(cur);
+    const W = (i) => pressureWidth(s.size, pw[i]) * grow;
+    if (n === 1) {
+      const h = W(0) / 2;
+      return `M${r1(p[0] - h)} ${r1(p[1])}a${h} ${h} 0 1 0 ${2 * h} 0a${h} ${h} 0 1 0 ${-2 * h} 0Z`;
+    }
+    // Samples along the smoothed centre line: x, y, width.
+    const q = [];
+    for (let i = 0; i < n; i++) {
+      const [sx, sy, cx, cy, ex, ey] = segment(p, i);
+      const w0 = i === 0 ? W(0) : (W(i - 1) + W(i)) / 2;
+      const w1 = i === n - 1 ? W(n - 1) : (W(i) + W(i + 1)) / 2;
+      for (const t of i === 0 ? [0, 0.5, 1] : [0.5, 1]) {
+        const x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cx + t * t * ex;
+        const y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cy + t * t * ey;
+        const last = q.length - 3;
+        if (last >= 0 && Math.abs(q[last] - x) < 0.01 && Math.abs(q[last + 1] - y) < 0.01) continue;
+        q.push(x, y, w0 + (w1 - w0) * t);
       }
-      cur.d += `Q${cx} ${cy} ${r1(ex)} ${r1(ey)}`;
     }
-    return runs;
+    const m = q.length / 3;
+    const left = [];
+    const right = [];
+    let nx = 0;
+    let ny = -1;
+    const ends = {}; // direction and normal at the first and last sample, for the round ends
+    for (let k = 0; k < m; k++) {
+      const a = Math.max(0, k - 1);
+      const b = Math.min(m - 1, k + 1);
+      let tx = q[b * 3] - q[a * 3];
+      let ty = q[b * 3 + 1] - q[a * 3 + 1];
+      const len = Math.hypot(tx, ty);
+      if (len > 1e-6) {
+        tx /= len;
+        ty /= len;
+        nx = -ty;
+        ny = tx;
+      } else {
+        tx = ny;
+        ty = -nx;
+      }
+      if (k === 0) ends.start = [tx, ty, nx, ny];
+      if (k === m - 1) ends.end = [tx, ty, nx, ny];
+      const h = q[k * 3 + 2] / 2;
+      left.push(q[k * 3] + nx * h, q[k * 3 + 1] + ny * h);
+      right.push(q[k * 3] - nx * h, q[k * 3 + 1] - ny * h);
+    }
+    const pts = [...left];
+    // Round end: from the left edge, around the front, to the right edge.
+    const e = (m - 1) * 3;
+    const [etx, ety, enx, eny] = ends.end;
+    cap(q[e], q[e + 1], enx, eny, etx, ety, q[e + 2] / 2, 0, pts);
+    for (let k = m - 1; k >= 0; k--) pts.push(right[k * 2], right[k * 2 + 1]);
+    // Round start: from the right edge, around the back, to the left edge.
+    const [stx, sty, snx, sny] = ends.start;
+    cap(q[0], q[1], snx, sny, stx, sty, q[2] / 2, Math.PI, pts);
+    let d = `M${r1(pts[0])} ${r1(pts[1])}`;
+    for (let k = 2; k < pts.length; k += 2) d += `L${Math.round(pts[k] * 100) / 100} ${Math.round(pts[k + 1] * 100) / 100}`;
+    return `${d}Z`;
   }
 
-  const paths = new WeakMap();
+  /*
+    Drawing on screen. The browser draws a line's edges in steps of half a screen pixel, so thin lines only
+    come in a few thicknesses (0.5, 0.56 and 0.63 would look alike, then 0.71 jumps). Each stroke is drawn
+    a little wider, to the next half pixel, and lighter by the same amount, so the ink on screen grows in
+    the same even steps as the sizes. Files and PDF export keep the exact widths.
+  */
+  const paths = new WeakMap(); // stroke -> { grow, path }
   function drawStroke(ctx, s) {
-    let runs = paths.get(s);
-    if (!runs) {
-      runs = widths(s) ? pressureRuns(s).map((r) => ({ w: r.w, p: new Path2D(r.d) })) : [{ w: s.size, p: new Path2D(strokeD(s)) }];
-      paths.set(s, runs);
+    const scale = Math.abs(ctx.getTransform().a) || 1;
+    const device = s.size * scale;
+    const drawn = Math.max(1, Math.ceil(device * 2 - 1e-6) / 2);
+    const grow = Math.round((drawn / device) * 1000) / 1000;
+    const varies = !!widths(s);
+    let cached = paths.get(s);
+    if (!cached || cached.grow !== grow) {
+      cached = { grow, path: new Path2D(varies ? outlineD(s, grow) : strokeD(s)) };
+      paths.set(s, cached);
     }
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = s.tool === 'marker' ? MARKER_ALPHA : 1;
+    ctx.globalAlpha = (s.tool === 'marker' ? MARKER_ALPHA : 1) / grow;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = s.color;
-    for (const r of runs) {
-      ctx.lineWidth = r.w;
-      ctx.stroke(r.p);
+    if (varies) {
+      ctx.fillStyle = s.color;
+      ctx.fill(cached.path);
+    } else {
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = s.color;
+      ctx.lineWidth = s.size * grow;
+      ctx.stroke(cached.path);
     }
+    ctx.globalAlpha = 1;
   }
 
-  // SVG markup for a stroke (used for live previews and vector PDF export).
+  // SVG markup for a stroke (used for live previews and vector PDF export): exact widths.
   function strokeSvg(s) {
-    const op = s.tool === 'marker' ? ` stroke-opacity="${MARKER_ALPHA}"` : '';
-    const attrs = `fill="none" stroke="${s.color}" stroke-linecap="round" stroke-linejoin="round"${op}`;
-    if (widths(s)) return pressureRuns(s).map((r) => `<path d="${r.d}" stroke-width="${r.w}" ${attrs}/>`).join('');
-    return `<path d="${strokeD(s)}" stroke-width="${s.size}" ${attrs}/>`;
+    const op = s.tool === 'marker' ? ` opacity="${MARKER_ALPHA}"` : '';
+    if (widths(s)) return `<path d="${outlineD(s)}" fill="${s.color}" stroke="none"${op}/>`;
+    return `<path d="${strokeD(s)}" stroke-width="${s.size}" fill="none" stroke="${s.color}" stroke-linecap="round" stroke-linejoin="round"${op}/>`;
   }
 
   // ---------- Hit testing ----------
@@ -392,6 +463,7 @@
     MARKER_ALPHA,
     r1,
     pressureWidth,
+    outlineD,
     widths,
     filterPoint,
     FILTER_REACH,
