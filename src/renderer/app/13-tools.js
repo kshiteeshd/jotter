@@ -21,8 +21,8 @@ function setTool(tool) {
 /*
   Sizes go up in even steps of thickness, not of number: each step is about 12% thicker than the one before,
   so every step looks like the same change whether the line is thin or thick. The steps are the standard
-  "preferred numbers" (Renard R20): 1, 1.12, 1.25, 1.4, 1.6, 1.8, 2, 2.24, 2.5 … The slider, the [ and ] keys
-  and the size buttons all move along them.
+  "preferred numbers" (Renard R20): 1, 1.12, 1.25, 1.4, 1.6, 1.8, 2, 2.24, 2.5 … The − and + buttons, the
+  [ and ] keys and the five ready sizes all move along them.
 */
 const R20 = [1, 1.12, 1.25, 1.4, 1.6, 1.8, 2, 2.24, 2.5, 2.8, 3.15, 3.55, 4, 4.5, 5, 5.6, 6.3, 7.1, 8, 9];
 function gradual(min, max) {
@@ -35,17 +35,15 @@ function gradual(min, max) {
   }
   return out;
 }
-function sizeConfig(min, max) {
-  const steps = gradual(min, max);
-  // Eight buttons spread evenly along the steps.
-  const presets = Array.from({ length: 8 }, (_, i) => steps[Math.round((i * (steps.length - 1)) / 7)]);
-  return { min, max, steps, presets };
+// Five ready sizes per tool, each about twice the one before, all on the steps.
+function sizeConfig(min, max, presets) {
+  return { min, max, steps: gradual(min, max), presets };
 }
 const SIZE_CONFIG = {
-  pen: sizeConfig(0.4, 16),
-  marker: sizeConfig(4, 40),
-  eraser: sizeConfig(4, 80),
-  shape: sizeConfig(0.4, 12.5),
+  pen: sizeConfig(0.4, 16, [0.5, 1, 2, 4, 8]),
+  marker: sizeConfig(4, 40, [5, 8, 12.5, 20, 31.5]),
+  eraser: sizeConfig(4, 80, [8, 14, 25, 45, 80]),
+  shape: sizeConfig(0.4, 12.5, [0.5, 1, 2, 4, 8]),
 };
 const formatSize = (n) => (Math.round(n * 100) / 100).toString();
 // The step nearest to a size (nearest in thickness, so 0.5 is nearer 0.45 than 0.6).
@@ -87,13 +85,9 @@ function syncToolUi() {
   const t = state.tools[state.tool];
   const cfg = SIZE_CONFIG[state.tool];
   if (t.size && cfg) {
-    const max = String(cfg.steps.length - 1);
-    if (el.size.max !== max) {
-      el.size.min = 0;
-      el.size.max = max;
-      el.size.step = 1;
-    }
-    el.size.value = stepIndex(cfg, t.size);
+    const i = stepIndex(cfg, t.size);
+    $('size-down').disabled = i === 0;
+    $('size-up').disabled = i === cfg.steps.length - 1;
     el.sizeValue.textContent = formatSize(t.size);
     const d = dotFor(cfg, t.size, 2, 26);
     el.sizeDot.style.width = el.sizeDot.style.height = `${d}px`;
@@ -145,10 +139,8 @@ $('sel-swatches').addEventListener('click', (e) => {
   if (e.target.dataset.color) recolorSelection(e.target.dataset.color);
 });
 el.customColor.addEventListener('input', () => setColor(el.customColor.value));
-el.size.addEventListener('input', () => {
-  const cfg = SIZE_CONFIG[state.tool];
-  if (cfg) setSize(cfg.steps[Number(el.size.value)]);
-});
+$('size-down').addEventListener('click', () => stepSize(-1));
+$('size-up').addEventListener('click', () => stepSize(1));
 $('size-presets').addEventListener('click', (e) => {
   const b = e.target.closest('[data-value]');
   if (b) setSize(Number(b.dataset.value));

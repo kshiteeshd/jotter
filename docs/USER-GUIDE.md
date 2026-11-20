@@ -21,7 +21,7 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 ## Writing
 
 - **Type (T)**: text style, bold, italic, underline, lists, checklists (click the box to tick), then insert a table, an image, a link (Ctrl+click to open it) or a free text box you can drag anywhere.
-- **Pen (P)** and **Marker (M)**: pick a colour and size. Hold **Shift** for a straight line. Lines are steadied automatically; pen lines taper at the ends; a pen with pressure draws thicker when you press harder.
+- **Pen (P)** and **Marker (M)**: pick a colour, then a size: one of five ready sizes, or **−** / **+** (or **[** / **]**) to go one step thinner or thicker. Each step is about 12% thicker than the last. Hold **Shift** for a straight line. Lines are steadied automatically; pen lines taper at the ends; a pen with pressure draws thicker when you press harder.
 - **Eraser (E)**: *Rub out* removes only what you touch; *Whole stroke* removes a stroke with one touch. A pen's eraser end works too.
 - **Shapes (S)**: line, arrow, rectangle, ellipse. Shift makes squares, circles and 45° lines.
 - **Select (L)**: draw a loop around ink, then drag it, resize it from the corner, recolour, copy, duplicate or delete.

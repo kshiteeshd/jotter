@@ -217,8 +217,33 @@ group('ink tools', async () => {
   key('[');
   const down = await js('state.tools.pen.size');
   check('[ goes one gradual step down', down < s3 && s3 / down < 1.2, `${s3} -> ${down}`);
-  await js(`el.size.value = 0; el.size.dispatchEvent(new Event('input')); 0`);
-  equal('the slider starts at the thinnest size', await js('state.tools.pen.size'), 0.4);
+  // − and + step one size at a time and stop at the ends.
+  await js(`setSize(3.15); 0`);
+  await click('#size-up');
+  equal('+ is one step thicker', await js('state.tools.pen.size'), 3.55);
+  await click('#size-down');
+  await click('#size-down');
+  equal('− is one step thinner', await js('state.tools.pen.size'), 2.8);
+  await js(`setSize(0.4); 0`);
+  check('− is off at the thinnest size', await js(`document.getElementById('size-down').disabled && !document.getElementById('size-up').disabled`));
+  await js(`setSize(16); 0`);
+  check('+ is off at the thickest size', await js(`document.getElementById('size-up').disabled`));
+  // Nothing in the bar moves while stepping through every size, with the bar at the side or at the bottom.
+  const moved = [];
+  for (const side of ['right', 'bottom']) {
+    await js(`setDockSide('${side}'); setSize(0.4); 0`);
+    await frame();
+    const spots = await js(`(() => {
+      const at = () => ['#dock', '#size-up', '#size-down', '#size-value', '.tool[data-tool="pen"]'].map((q) => { const r = document.querySelector(q).getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round).join(','); }).join(' ');
+      const seen = new Set();
+      for (let i = 0; i < SIZE_CONFIG.pen.steps.length; i++) { seen.add(at()); stepSize(1); }
+      return seen.size;
+    })()`);
+    if (spots !== 1) moved.push(`${side}: ${spots} layouts`);
+  }
+  await js(`setDockSide('right'); setSize(3.15); 0`);
+  check('stepping through every size never moves the bar', !moved.length, moved.join(', '));
+  equal('five ready sizes', await js(`document.querySelectorAll('#size-presets .preset').length`), 5);
   // The pen's nib (the pointer on the page) stays steady while writing with a tablet.
   await js(`setTool('pen'); 0`);
   const nib = (code) => js(`(() => {

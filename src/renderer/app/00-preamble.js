@@ -31,7 +31,6 @@ const el = {
   pageList: $('page-list'),
   pageTitle: $('page-title'),
   nbName: $('nb-name'),
-  size: $('size'),
   sizeValue: $('size-value'),
   sizeDot: $('size-dot'),
   swatches: $('swatches'),

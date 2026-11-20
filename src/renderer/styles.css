@@ -322,9 +322,13 @@ body[data-tool='text'] #swatches { display: none !important; }
 #eraser-mode { display: flex; flex-direction: column; width: 46px; }
 #eraser-mode button { width: 100%; min-width: 0; padding: 0; font-size: var(--t-xs); }
 #eraser-mode-row .btn.small { width: 46px; padding: 0; font-size: var(--t-xs); }
-/* A vertical slider: up is larger. */
-#size { writing-mode: vertical-lr; direction: rtl; width: 20px; height: 88px; margin: 0; accent-color: var(--accent); }
-#size-value { min-width: 0; text-align: center; color: var(--muted); font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
+/* − size +: one step at a time. The number sits in a fixed width, so nothing moves as it changes; in a
+   column, + is on top (up is thicker). */
+.size-step { display: flex; flex-direction: column-reverse; align-items: center; gap: 2px; }
+.size-step .btn.icon.small { width: 32px; height: 28px; font-size: 16px; line-height: 1; color: var(--muted); }
+.size-step .btn.icon.small:hover:not(:disabled) { color: var(--text); }
+.size-step .btn:disabled { opacity: 0.35; cursor: default; background: transparent; }
+#size-value { display: block; width: 40px; text-align: center; color: var(--text); font-size: var(--t-sm); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Right and left: a column centred on the page area's height. */
 body:is([data-dock='right'], [data-dock='left']) #dock { top: 50%; transform: translateY(-50%); align-items: stretch; max-height: calc(100% - var(--s6)); }
@@ -345,7 +349,7 @@ body[data-dock='bottom'] #btn-rail .ic { transform: rotate(0deg); }
 body[data-dock='bottom'].rail-collapsed #btn-rail .ic { transform: rotate(180deg); }
 body[data-dock='top'] #btn-rail .ic { transform: rotate(180deg); }
 body[data-dock='top'].rail-collapsed #btn-rail .ic { transform: rotate(0deg); }
-body:is([data-dock='top'], [data-dock='bottom']) :is(.dock-main, .tools, .opt, #swatches, #shape-kind, #eraser-mode, .size-ui, .size-fine, .size-presets) { flex-direction: row; }
+body:is([data-dock='top'], [data-dock='bottom']) :is(.dock-main, .tools, .opt, #swatches, #shape-kind, #eraser-mode, .size-ui, .size-step, .size-presets) { flex-direction: row; }
 body:is([data-dock='top'], [data-dock='bottom']) .dock-sep { width: 1px; height: 24px; margin: 0 var(--s1); }
 body:is([data-dock='top'], [data-dock='bottom']) #btn-dock-grip { width: 24px; height: var(--control); }
 body:is([data-dock='top'], [data-dock='bottom']) .opts {
@@ -356,7 +360,6 @@ body[data-dock='top'] .opts { margin: var(--s1) 0 0; border-bottom: 0; border-to
 body:is([data-dock='top'], [data-dock='bottom']) #insert-options { padding: 0 0 0 var(--s3); border-top: 0; border-left: 1px solid var(--line); }
 body:is([data-dock='top'], [data-dock='bottom']) #eraser-mode { width: auto; }
 body:is([data-dock='top'], [data-dock='bottom']) #eraser-mode button, body:is([data-dock='top'], [data-dock='bottom']) #eraser-mode-row .btn.small { width: auto; padding: 0 var(--s2); }
-body:is([data-dock='top'], [data-dock='bottom']) #size { writing-mode: horizontal-tb; direction: ltr; width: 88px; height: 20px; }
 body:is([data-dock='top'], [data-dock='bottom']) .tool.active::after { left: 50%; top: auto; bottom: 3px; margin: 0 0 0 -2px; }
 
 /* While dragging the grip, the edge it will dock to lights up. */
@@ -375,7 +378,6 @@ body[data-tool='eraser'] :is(#text-options, #insert-options, #shape-options, #co
 body[data-tool='select'] :is(#text-options, #insert-options, #shape-options, #size-options, #eraser-mode-row, #color-options) { display: none; }
 
 .size-ui { display: flex; flex-direction: column; align-items: center; gap: var(--s2); }
-.size-fine { display: flex; flex-direction: column; align-items: center; gap: var(--s1); }
 .size-preview { width: 32px; height: 32px; flex: none; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 1px var(--swatch-ring); }
 #size-dot { border-radius: 50%; background: #1f1b18; }
 body[data-tool='eraser'] #size-dot { background: transparent; box-shadow: 0 0 0 1.5px #777; }

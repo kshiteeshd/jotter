@@ -180,10 +180,11 @@
             <div class="size-ui" id="size-ui" aria-label="Size">
               <span class="size-preview" title="Preview"><span id="size-dot"></span></span>
               <div id="size-presets" class="size-presets" role="group" aria-label="Size presets"></div>
-              <label class="size-fine" title="Fine size ( [ and ] )">
-                <input type="range" id="size" min="1" max="60" step="1" value="3" aria-label="Size">
-                <output id="size-value">3</output>
-              </label>
+              <div class="size-step" role="group" aria-label="Size">
+                <button class="btn icon small" id="size-down" type="button" title="Thinner ( [ )" aria-label="Thinner">−</button>
+                <output id="size-value" aria-live="polite">3</output>
+                <button class="btn icon small" id="size-up" type="button" title="Thicker ( ] )" aria-label="Thicker">+</button>
+              </div>
             </div>
           </div>
           <div class="opt" id="eraser-mode-row">
