@@ -298,14 +298,15 @@ group('undo and redo', async () => {
   redoKey();
   await until(`(commitEditor(), Model.pageText(page())).includes('Second')`);
 
-  // Changes to pages and sections are steps too, and undo opens the page where the change was.
+  // Changes to pages and sections are steps too. Undo never takes you anywhere.
   await js(`addPage(); 0`);
   const added = await js('pages().length');
   await js(`setTool('pen'); 0`);
   await drag(wave(250));
+  const addedId = await js('page().id');
   await js(`showPage(0); 0`);
   undoKey();
-  check('undo opens the page where the last change was', await until(`state.pageIdx === 1 && page().strokes.length === 0`), await where());
+  check('undo of a change on another page leaves you on your page', await until(`state.pageIdx === 0 && Model.allPages(state.nb).find((p) => p.id === '${addedId}').strokes.length === 0`), await where());
   undoKey();
   check('undo takes back a new page', await until(`pages().length === ${added - 1}`));
   await js(`document.querySelector('#page-mode [data-value="infinite"]').click(); 0`);
@@ -347,13 +348,61 @@ group('undo and redo', async () => {
   await frame();
   undoKey();
   await until('page().strokes.length === 0');
-  check('a change out of sight is scrolled into view', await js(`(() => { const s = sheetScale(), ws = el.workspace.getBoundingClientRect(); const top = (ws.top - s.rect.top) * s.k, bottom = (ws.bottom - s.rect.top) * s.k; return ${view.y + 220} >= top && ${view.y + 280} <= bottom; })()`));
+  check('a change out of sight is undone without scrolling', (await js('el.workspace.scrollTop')) === 0, await js('el.workspace.scrollTop'));
   redoKey();
   await until('page().strokes.length === 1');
-  await js(`showPage(0); 0`);
+  const extraId = await js('page().id');
+  await js(`showPage(0); el.workspace.scrollTop = 120; 0`);
+  await frame();
+  const stay = JSON.stringify(await js('[state.secIdx, state.pageIdx, el.workspace.scrollTop]'));
   undoKey();
-  check('undo on another page opens it at the change', await until(`page().strokes.length === 0 && el.workspace.scrollTop > 800`), await js('[state.pageIdx, el.workspace.scrollTop]'));
-  await js(`deletePage(state.pageIdx); 0`);
+  await until(`Model.allPages(state.nb).find((p) => p.id === '${extraId}').strokes.length === 0`);
+  equal('undo of a change on another page keeps your page and scroll', JSON.stringify(await js('[state.secIdx, state.pageIdx, el.workspace.scrollTop]')), stay);
+  await js(`deletePage(pages().findIndex((p) => p.id === '${extraId}')); 0`);
+
+  // Your case: ink on one page, then on another page; undo takes back the second and you stay put.
+  await js(`addPage(); addPage(); showPage(pages().length - 2); setTool('pen'); 0`);
+  await drag(wave(200));
+  await js(`showPage(pages().length - 1); el.workspace.scrollTop = 60; 0`);
+  await drag(wave(300));
+  await frame();
+  const here = JSON.stringify(await js('[state.secIdx, state.pageIdx, el.workspace.scrollTop]'));
+  undoKey();
+  await until('page().strokes.length === 0');
+  equal('undo after switching pages stays on the page and spot you are on', JSON.stringify(await js('[state.secIdx, state.pageIdx, el.workspace.scrollTop]')), here);
+  check('…and the other page keeps its ink', await js('pages()[pages().length - 2].strokes.length === 1'));
+  undoKey();
+  await until('pages()[pages().length - 2].strokes.length === 0');
+  equal('undoing ink on the other page still does not move you', JSON.stringify(await js('[state.secIdx, state.pageIdx, el.workspace.scrollTop]')), here);
+  undoKey();
+  check('undoing the page you are on leaves you at its place in the section', await until(`state.pageIdx === pages().length - 1 && !!page()`));
+  undoKey();
+  await until(`pages().every((p) => !p.title.startsWith('Page 4'))`);
+
+  // The sidebar keeps its scroll position too.
+  await js(`for (let i = 0; i < 30; i++) addPage(); showPage(0); el.pageList.scrollTop = 200; 0`);
+  await frame();
+  const listTop = await js('el.pageList.scrollTop');
+  await js(`renameItem('page', 20, 'Renamed in the list'); 0`);
+  equal('renaming a page in a long list keeps the list where it was', await js('el.pageList.scrollTop'), listTop);
+  undoKey();
+  await until(`pages()[20].title !== 'Renamed in the list'`);
+  equal('undo keeps the sidebar list where it was', await js('el.pageList.scrollTop'), listTop);
+  await js(`for (let i = 0; i < 30; i++) undo(); 0`);
+
+  // Undo while typing: the cursor stays where the change was, so typing goes on there.
+  await js(`showPage(0); setTool('text'); 0`);
+  await js(`el.editor.focus(); document.getSelection().collapse(el.editor, el.editor.childNodes.length); 0`);
+  await typeText(' tail');
+  key('Return');
+  await typeText('More words');
+  undoKey();
+  await until(`!(commitEditor(), Model.pageText(page())).includes('More words')`);
+  wc.insertText('X');
+  await frame();
+  check('after undoing typing, new typing goes where the undone text was', await js(`(commitEditor(), !Model.pageText(page()).startsWith('X'))`), await js(`Model.pageText(page()).slice(0, 40)`));
+  undoKey();
+  await until(`!(commitEditor(), Model.pageText(page())).includes('X')`);
 
   // Redo is cleared by a new change; nothing to undo is harmless.
   undoKey();

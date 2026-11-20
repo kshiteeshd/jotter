@@ -19,6 +19,7 @@ const delButton = (label) => rowButton('del', 'i-close', label);
 
 function renderSections() {
   const list = el.sectionList;
+  const top = list.scrollTop;
   list.textContent = '';
   state.nb.sections.forEach((s, i) => {
     const li = document.createElement('li');
@@ -42,6 +43,7 @@ function renderSections() {
     li.append(dye, name, count, rowButton('ren', 'i-edit', `Rename section ${s.title}`), delButton(`Delete section ${s.title}`));
     list.append(li);
   });
+  list.scrollTop = top; // drawing the list again keeps it where it was
   $('side-cover').innerHTML = Covers.svg(state.nb.cover);
 }
 

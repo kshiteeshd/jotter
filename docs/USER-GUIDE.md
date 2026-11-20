@@ -26,7 +26,7 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 - **Shapes (S)**: line, arrow, rectangle, ellipse. Shift makes squares, circles and 45° lines.
 - **Select (L)**: draw a loop around ink, then drag it, resize it from the corner, recolour, copy, duplicate or delete.
 - **[ and ]** make the current tool smaller or larger. **Space + drag** or the middle mouse button moves around the page.
-- **Undo / Redo** (Ctrl+Z / Ctrl+Y, or Ctrl+Shift+Z) take back the very last change in the notebook, whatever it was: ink, typing (a run at a time), a new, moved or deleted page or section, a renamed title, the page type or paper, a colour. Undo opens the page where the change was. A tablet pen button set to Ctrl+Z, or to a driver's own Undo, works too.
+- **Undo / Redo** (Ctrl+Z / Ctrl+Y, or Ctrl+Shift+Z) take back the very last change in the notebook, whatever it was: ink, typing (a run at a time), a new, moved or deleted page or section, a renamed title, the page type or paper, a colour. Undo only undoes: you stay on the page you are on, scrolled where you are, even when the change was on another page. A tablet pen button set to Ctrl+Z, or to a driver's own Undo, works too.
 
 ## Pages
 

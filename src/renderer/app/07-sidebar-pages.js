@@ -1,7 +1,12 @@
 // ---------- Sidebar: pages ----------
 
+// The list keeps its scroll position when it is drawn again (a rename, an undo); it scrolls to show the open
+// page only when you have moved to another page or section.
+let listShown = { sec: -1, page: -1 };
 function renderPageList() {
   commitEditor();
+  const sameSection = listShown.sec === state.secIdx;
+  const top = el.pageList.scrollTop;
   el.pageList.textContent = '';
   pages().forEach((p, i) => {
     const li = document.createElement('li');
@@ -14,16 +19,18 @@ function renderPageList() {
     li.append(title, rowButton('ren', 'i-edit', `Rename page ${p.title}`), delButton(`Delete page ${p.title}`));
     el.pageList.append(li);
   });
-  markActiveInList();
+  if (sameSection) el.pageList.scrollTop = top;
+  markActiveInList(!sameSection || listShown.page !== state.pageIdx);
 }
 
-function markActiveInList() {
+function markActiveInList(reveal = true) {
   [...el.pageList.children].forEach((li, i) => {
     const active = i === state.pageIdx;
     li.setAttribute('aria-selected', String(active));
     li.tabIndex = active ? 0 : -1;
-    if (active) li.scrollIntoView({ block: 'nearest' });
+    if (active && reveal) li.scrollIntoView({ block: 'nearest' });
   });
+  listShown = { sec: state.secIdx, page: state.pageIdx };
   const counts = el.sectionList.querySelectorAll('.count');
   if (counts[state.secIdx]) counts[state.secIdx].textContent = pages().length;
 }

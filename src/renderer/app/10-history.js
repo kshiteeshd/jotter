@@ -23,7 +23,6 @@ function snapshot() {
     paperColor: nb.paperColor,
     cover: nb.cover,
     sections: nb.sections.map((s) => ({ ...s, pages: s.pages.map((p) => ({ ...p })) })),
-    at: { sec: state.secIdx, page: state.pageIdx, id: page().id },
   };
 }
 
@@ -76,40 +75,41 @@ function endTyping() {
   undoLog.base = snapshot();
 }
 
-// The part of a page (sheet units, top to bottom) where its ink differs between two versions of it.
-function inkChange(before, after) {
-  if (!before || before.strokes === after.strokes) return null;
-  const was = new Set(before.strokes);
-  const now = new Set(after.strokes);
-  let top = Infinity;
-  let bottom = -Infinity;
-  for (const s of [...before.strokes.filter((x) => !now.has(x)), ...after.strokes.filter((x) => !was.has(x))]) {
-    const b = Ink.box(s);
-    top = Math.min(top, b.minY - b.pad);
-    bottom = Math.max(bottom, b.maxY + b.pad);
-  }
-  return top === Infinity ? null : { top, bottom };
+// Typing goes on where the change was: after an undo the cursor sits where the undone text was, after a
+// redo at the end of the text that came back. (Character positions in the page's text.)
+function caretAfterChange(oldText, newText) {
+  let a = 0;
+  while (a < oldText.length && a < newText.length && oldText[a] === newText[a]) a++;
+  let b = 0;
+  while (b < oldText.length - a && b < newText.length - a && oldText[oldText.length - 1 - b] === newText[newText.length - 1 - b]) b++;
+  return newText.length - b;
 }
-
-// Scroll just enough to bring part of the page into view; leave the view alone if it is already there.
-function reveal({ top, bottom }) {
-  const s = sheetScale();
-  if (!s) return;
-  const ws = el.workspace.getBoundingClientRect();
-  const y0 = s.rect.top + top / s.k;
-  const y1 = s.rect.top + bottom / s.k;
-  const margin = 48;
-  if (y0 >= ws.top + margin && y1 <= ws.bottom - margin) return;
-  el.workspace.scrollTop += y1 - y0 > ws.height - 2 * margin || y0 < ws.top + margin ? y0 - (ws.top + margin) : y1 - (ws.bottom - margin);
+function placeCaret(index) {
+  const walk = document.createTreeWalker(el.editor, NodeFilter.SHOW_TEXT);
+  let left = index;
+  let node = null;
+  while ((node = walk.nextNode())) {
+    if (left <= node.length) break;
+    left -= node.length;
+  }
+  const range = document.createRange();
+  if (node) range.setStart(node, Math.max(0, left));
+  else range.selectNodeContents(el.editor), range.collapse(false);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 // What the sidebar shows, to tell whether it needs drawing again.
 const sidebarSig = (nb) => JSON.stringify(nb.sections.map((s) => [s.title, s.color, s.pages.map((p) => [p.id, p.title])]));
 
 /*
-  Put the notebook back to a snapshot. The page you are looking at is not reloaded: only what changed on
-  it is updated in place (its ink, its text, its title, its paper), so the view stays exactly where it is,
-  moving only if the change is out of sight. A change on another page opens that page, at the change.
+  Put the notebook back to a snapshot. Undo only undoes: you stay on the page and section you are on, the
+  page and the sidebar stay scrolled where they are, and the page is not reloaded; only what changed on it
+  is updated in place (its ink, text, title or paper). A change on another page is undone there without
+  taking you to it. Only when the undo removes the very page you are on do you move, to the page now in
+  its place in the same section.
 */
 function restoreSnapshot(snap) {
   undoLog.restoring = true;
@@ -118,43 +118,59 @@ function restoreSnapshot(snap) {
     hideFloatbars();
     const nb = state.nb;
     const shown = page();
-    const before = { sidebar: sidebarSig(nb), paperColor: nb.paperColor, cover: nb.cover, sec: state.secIdx };
-    const old = new Map();
-    for (const s of nb.sections) for (const p of s.pages) old.set(p.id, p);
+    const view = { top: el.workspace.scrollTop, left: el.workspace.scrollLeft };
+    const lists = { sections: el.sectionList.scrollTop, pages: el.pageList.scrollTop };
+    const before = { sidebar: sidebarSig(nb), paperColor: nb.paperColor, cover: nb.cover, sec: state.secIdx, page: state.pageIdx };
     nb.paperColor = snap.paperColor;
     nb.cover = snap.cover;
     nb.sections = snap.sections.map((s) => ({ ...s, pages: s.pages.map((p) => ({ ...p, rev: ++revSeq })) }));
-    let sec = Math.min(snap.at.sec, nb.sections.length - 1);
-    let pg = Math.min(snap.at.page, nb.sections[sec].pages.length - 1);
-    nb.sections.forEach((s, si) => s.pages.forEach((p, pi) => p.id === snap.at.id && ([sec, pg] = [si, pi])));
+
+    let sec = -1;
+    let pg = -1;
+    nb.sections.forEach((s, si) => s.pages.forEach((p, pi) => p.id === shown.id && ((sec = si), (pg = pi))));
+    const stays = sec >= 0;
+    if (!stays) {
+      sec = Math.min(before.sec, nb.sections.length - 1);
+      pg = Math.min(before.page, nb.sections[sec].pages.length - 1);
+    }
     state.secIdx = sec;
     state.pageIdx = pg;
     const now = page();
 
-    if (now.id === shown.id) {
+    if (stays) {
       editorPage = now;
       editorChanged = false;
       if (now.html !== shown.html) {
+        const typing = document.activeElement === el.editor || el.editor.contains(document.activeElement);
+        const oldText = el.editor.textContent;
         el.editor.innerHTML = now.html;
         prepareBoxes();
+        if (typing) {
+          el.editor.focus({ preventScroll: true });
+          placeCaret(caretAfterChange(oldText, el.editor.textContent));
+        }
       }
       if (now.title !== shown.title) el.pageTitle.value = now.title;
       if (now.mode !== shown.mode || now.paper !== shown.paper || nb.paperColor !== before.paperColor) applyPaper();
       if (now.mode !== shown.mode || now.sheets !== shown.sheets) layoutSheets();
       if (now.strokes !== shown.strokes) redrawInk();
       if (now.html !== shown.html) now.mode === 'paged' ? growToFit() : ensureRoom(textBottom(el.editor));
-      const change = inkChange(shown, now);
-      if (change) reveal(change);
     } else {
-      loadPage(false);
-      const change = inkChange(old.get(now.id), now);
-      if (change) reveal(change);
+      loadPage(false, { scroll: view, fade: false });
     }
-    if (sidebarSig(nb) !== before.sidebar || state.secIdx !== before.sec) renderSidebar();
-    else markActiveInList();
+    if (sidebarSig(nb) !== before.sidebar || sec !== before.sec || pg !== before.page) {
+      renderSidebar();
+      el.sectionList.scrollTop = lists.sections;
+      el.pageList.scrollTop = lists.pages;
+    } else {
+      const counts = el.sectionList.querySelectorAll('.count');
+      if (counts[sec]) counts[sec].textContent = pages().length;
+    }
     if (nb.cover !== before.cover) applyCoverTheme();
     updateBlank();
     syncChrome();
+    el.workspace.scrollTop = view.top;
+    el.workspace.scrollLeft = view.left;
     markDirty(null);
   } finally {
     undoLog.restoring = false;
