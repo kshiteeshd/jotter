@@ -52,6 +52,7 @@ async function pagesToExport(all = Model.allPages(state.nb)) {
     message: `Include the ${plural(infinite, 'infinite page')}?`,
     detail: `There ${paged === 1 ? 'is' : 'are'} ${plural(paged, 'A4 page')} and ${plural(infinite, 'infinite page')}. Infinite pages are trimmed to what is on them and cut into A4 sheets.`,
     buttons: ['A4 pages only', 'Include infinite pages', 'Cancel'],
+    notes: ['Leave the infinite pages out', 'Trimmed to what is on them and cut into A4 sheets'],
     cancelId: 2,
   });
   if (r === 0) return all.filter((p) => p.mode !== 'infinite');
@@ -68,6 +69,7 @@ async function exportLook() {
     message: 'Which background should the PDF have?',
     detail: 'White prints cleanly. The paper keeps the PDF looking like the notebook on screen. Lines are included either way.',
     buttons: ['White', texture === 'none' ? 'Paper colour' : 'Paper colour and texture', 'Cancel'],
+    notes: ['Prints cleanly', 'Looks like the notebook on screen'],
     cancelId: 2,
   });
   if (r === 0) return { background: Model.PAPER_COLORS.white, texture: 'none' };
@@ -77,22 +79,25 @@ async function exportLook() {
 
 const fileName = (name) => name.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
 
-// Export as PDF: the whole notebook in one file, each section in a file of its own, or this section.
-async function exportPdf() {
+// Export as PDF: the whole notebook in one file, each section in a file of its own, or one section
+// (`section`: a section's index, from its menu).
+async function exportPdf({ section: only } = {}) {
   commitEditor();
   const nb = state.nb;
-  let scope = 'all';
-  if (nb.sections.length > 1) {
+  let scope = only === undefined ? 'all' : 'this';
+  const sec = nb.sections[only === undefined ? state.secIdx : only];
+  if (only === undefined && nb.sections.length > 1) {
     const r = await ask({
       message: 'What should the PDF include?',
-      detail: `This notebook has ${plural(nb.sections.length, 'section')}. Each section can also be its own PDF, all saved together in a folder you choose.`,
-      buttons: ['Whole notebook', 'Each section as its own PDF', `This section only`, 'Cancel'],
+      detail: `This notebook has ${plural(nb.sections.length, 'section')}.`,
+      buttons: ['Whole notebook', 'Each section as its own PDF', 'This section only', 'Cancel'],
+      notes: ['One PDF with every section', 'One PDF per section, saved together in a folder you choose', `Only “${sec.title}”`],
       cancelId: 3,
     });
     if (r !== 0 && r !== 1 && r !== 2) return;
     scope = ['all', 'each', 'this'][r];
   }
-  const list = await pagesToExport(scope === 'this' ? section().pages.slice() : Model.allPages(nb));
+  const list = await pagesToExport(scope === 'this' ? sec.pages.slice() : Model.allPages(nb));
   if (!list) return;
   const look = await exportLook();
   if (!look) return;
@@ -111,7 +116,7 @@ async function exportPdf() {
   }
   if (!list.length) return flash('Nothing to export: this section has only infinite pages.');
   flash('Exporting PDF…');
-  const name = scope === 'this' ? fileName(`${notebookName()} - ${section().title}`) : notebookName();
+  const name = scope === 'this' ? fileName(`${notebookName()} - ${sec.title}`) : notebookName();
   const res = await api.exportPdf({ pages: exportPayload(list), suggestedName: name, ...look });
   if (!res) return flash('');
   if (res.error) return showError(res.error);

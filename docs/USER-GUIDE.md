@@ -15,7 +15,7 @@ Home shows a greeting, one-click covers to start a new notebook, the notebook yo
 ## The notebook window
 
 - **Top bar**: on the left Home, show/hide the sidebar, then where you are: the notebook name (click to rename), the section, and the page name (click to edit). In the middle, over the page, the page's type (Paged / Infinite) and paper (Plain, Ruled, Grid, Dots, Kolam). On the right the save dot, zoom, search, export as PDF and Settings. The dot is green when everything is saved, amber while saving, red if something could not be saved.
-- **Sidebar**: sections at the top, the pages of the current section below. Right-click a section or page for rename, colour, duplicate, move and delete. Drag pages to reorder them or onto a section to move them.
+- **Sidebar**: sections at the top, the pages of the current section below. Each section and page has a **⋯** button (and the same menu on right-click). A section's menu has **Download as PDF** (that section only), **Rename**, its **Colour** (clicking the coloured dot opens the same menu) and **Delete**; a page's menu has rename, duplicate, move to another section, clear ink and delete. Drag pages to reorder them or onto a section to move them.
 - **Tool bar**: grouped as Type · Pen, Marker, Shapes · Eraser, Select, then Undo and Redo, then Focus mode and Full screen, with the chosen tool's options (colours, sizes, text styles, insert) beside them. It sits on the right at first; drag its grip (the six dots) to the left, top or bottom edge, or choose the side in **Settings → Tool bar**. The arrow folds the options away.
 
 ## Writing

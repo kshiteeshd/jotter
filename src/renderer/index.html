@@ -291,10 +291,12 @@
   <div id="templates-menu" class="popover menu" role="menu" aria-label="New page from a template" hidden></div>
 
   <div id="section-menu" class="popover menu" role="menu" aria-label="Section" hidden>
-    <div id="section-menu-title"></div>
+    <div class="menu-title" id="section-menu-title"></div>
+    <button class="item" data-action="pdf"><svg class="ic"><use href="#i-download"/></svg>Download as PDF</button>
     <button class="item" data-action="rename"><svg class="ic"><use href="#i-edit"/></svg>Rename section<kbd>F2</kbd></button>
-    <div class="panel-label" style="padding: 8px 12px 0; margin: 0">Colour</div>
-    <div id="section-dyes" role="group" aria-label="Section colour"></div>
+    <hr>
+    <div class="menu-label">Colour <span id="section-colour-name"></span></div>
+    <div id="section-dyes" role="radiogroup" aria-label="Section colour"></div>
     <hr>
     <button class="item danger" data-action="delete"><svg class="ic"><use href="#i-trash"/></svg>Delete section</button>
   </div>
@@ -330,6 +332,7 @@
     <h2 id="ask-title"></h2>
     <p id="ask-detail"></p>
     <label class="field" id="ask-field" hidden><span class="panel-label" id="ask-label"></span><input id="ask-input" type="text" spellcheck="false"></label>
+    <div class="ask-choices" id="ask-choices" hidden></div>
     <div class="dialog-buttons" id="ask-buttons"></div>
   </dialog>
 

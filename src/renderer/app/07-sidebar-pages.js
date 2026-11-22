@@ -16,7 +16,7 @@ function renderPageList() {
     const title = document.createElement('span');
     title.className = 'title';
     title.textContent = p.title;
-    li.append(title, rowButton('ren', 'i-edit', `Rename page ${p.title}`), delButton(`Delete page ${p.title}`));
+    li.append(title, rowButton('more', 'i-more', `Rename, duplicate, move or delete ${p.title}`));
     el.pageList.append(li);
   });
   if (sameSection) el.pageList.scrollTop = top;
@@ -180,9 +180,11 @@ el.pageList.addEventListener('click', (e) => {
   const li = e.target.closest('li');
   if (!li || e.target.tagName === 'INPUT') return;
   const idx = Number(li.dataset.index);
-  if (e.target.closest('.del')) run('delete-page', () => deletePage(idx));
-  else if (e.target.closest('.ren')) startInlineRename(li, 'page');
-  else showPage(idx);
+  const more = e.target.closest('.more');
+  if (more) {
+    const r = more.getBoundingClientRect();
+    openPageMenu(idx, r.left, r.bottom);
+  } else showPage(idx);
 });
 el.pageList.addEventListener('dblclick', (e) => {
   const li = e.target.closest('li');

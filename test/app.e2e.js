@@ -102,7 +102,7 @@ async function answer(label, input) {
   if (!ready) throw new Error(`no dialog for "${label}"`);
   const ok = await js(`(() => {
     ${input != null ? `document.getElementById('ask-input').value = ${JSON.stringify(input)};` : ''}
-    const b = [...document.querySelectorAll('#ask-buttons button')].find((b) => b.textContent === ${JSON.stringify(label)});
+    const b = [...document.querySelectorAll('#ask-buttons button, #ask-choices .choice')].find((b) => (b.querySelector('.choice-title') || b).textContent === ${JSON.stringify(label)});
     if (b) b.click();
     return !!b;
   })()`);
@@ -466,7 +466,6 @@ group('pages and sections', async () => {
   await js(`extendPage(); 0`);
   equal('add a sheet', await js('page().sheets'), 2);
   check('sheets are separated by a numbered gap', await js(`el.breaks.firstElementChild?.dataset.n === '2'`));
-  await js(`cycleSectionColor(0); 0`);
   await js(`run('delete-section', () => deleteSection(1)); 0`);
   if (await until(`document.getElementById('ask').open`, 300)) await answer('Delete');
   equal('delete a section', await js('state.nb.sections.length'), 1);
@@ -528,6 +527,54 @@ group('sidebar', async () => {
   check('recolouring selected ink', await js(`page().strokes[0].color === '#2b4a8b'`));
   undoKey();
   check('undo takes back a recolour', await until(`page().strokes[0].color !== '#2b4a8b' && page().strokes[0].points[0] === ${at}`));
+});
+
+group('dialogs and menus', async () => {
+  await fresh('Menus');
+  await js(`addSection(); document.activeElement.blur(); renameItem('section', 1, 'Matrix and Determinants'); setTool('text'); 0`);
+  await typeText('Some notes');
+  check('every dialog has a close button', await js(`[...document.querySelectorAll('dialog')].every((d) => d.querySelector('.dialog-close'))`));
+  // Long answers are a list of full choices, nothing cut off.
+  await js(`run('export-pdf'); 0`);
+  await until(`document.getElementById('ask').open`);
+  const choices = await js(`[...document.querySelectorAll('#ask-choices .choice')].map((c) => ({ text: c.querySelector('.choice-title').textContent, note: !!c.querySelector('small'), cut: c.scrollWidth > c.clientWidth + 1 }))`);
+  equal('the export question lists its three choices in full', choices.map((c) => c.text), ['Whole notebook', 'Each section as its own PDF', 'This section only']);
+  check('…each with a note, none cut off', choices.every((c) => c.note && !c.cut));
+  await js(`document.querySelector('#ask .dialog-close').click(); 0`);
+  check('the close button cancels the question', await until(`!document.getElementById('ask').open && !busy`));
+  // Short answers: Cancel on the left, the main answer on the right.
+  await js(`run('delete-section', () => deleteSection(1)); 0`);
+  await until(`document.getElementById('ask').open`);
+  check('the main answer sits to the right of Cancel', await js(`(() => { const b = [...document.querySelectorAll('#ask-buttons button')]; const main = b.find((x) => x.textContent === 'Delete'), cancel = b.find((x) => x.textContent === 'Cancel'); return main.getBoundingClientRect().left > cancel.getBoundingClientRect().left; })()`));
+  await answer('Cancel');
+  // Each section has a ⋯ button with download, rename, colour and delete.
+  check('every section has a ⋯ button', await js(`[...el.sectionList.children].every((li) => li.querySelector('.more'))`));
+  await click('#section-list li:nth-child(2) .more');
+  check('⋯ opens the section menu', await until(`!document.getElementById('section-menu').hidden`));
+  equal('…with download, rename, colour and delete', await js(`[...document.querySelectorAll('#section-menu .item')].map((b) => b.textContent.replace('F2', '').trim())`), ['Download as PDF', 'Rename section', 'Delete section']);
+  check('…and every colour, naming the current one', await js(`document.querySelectorAll('#section-dyes .swatch').length === Model.DYES.length && document.getElementById('section-colour-name').textContent.length > 2`));
+  const green = await js(`Model.DYES[2][0]`);
+  await js(`document.querySelector('#section-dyes .swatch[data-color="${green}"]').click(); 0`);
+  equal('a colour from the menu colours the section', await js('state.nb.sections[1].color'), green);
+  await click('#section-list li:nth-child(1) .dye');
+  check('the colour dot opens the menu too', await until(`!document.getElementById('section-menu').hidden && document.getElementById('section-menu-title').textContent === 'Notes'`));
+  await js(`closePopovers(); 0`);
+  await click('#section-list li:nth-child(2) .more');
+  await until(`!document.getElementById('section-menu').hidden`);
+  fs.rmSync(outFiles.pdf, { force: true });
+  await js(`document.querySelector('#section-menu [data-action="pdf"]').click(); 0`);
+  for (let i = 0; i < 100 && !fs.existsSync(outFiles.pdf); i++) await sleep(50);
+  check('Download as PDF saves that section', fs.existsSync(outFiles.pdf));
+  await until('!busy', 5000);
+  await click('#section-list li:nth-child(2) .more');
+  await until(`!document.getElementById('section-menu').hidden`);
+  await js(`document.querySelector('#section-menu [data-action="delete"]').click(); 0`);
+  if (await until(`document.getElementById('ask').open`, 500)) await answer('Delete');
+  check('delete from the menu', await until('state.nb.sections.length === 1'));
+  // Pages have the same ⋯ button.
+  await click('#page-list li:nth-child(1) .more');
+  check('a page\'s ⋯ opens the page menu', await until(`!document.getElementById('page-menu').hidden`));
+  await js(`closePopovers(); 0`);
 });
 
 group('saving and files', async () => {

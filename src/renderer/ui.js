@@ -25,7 +25,12 @@
     Resolves to the index of the chosen button, or { index, value } when `input` is given
     ({ label, value, placeholder }). Esc chooses the cancel button.
   */
-  function ask({ message, detail = '', buttons = ['OK'], defaultId = 0, cancelId = buttons.length - 1, danger = false, input = null }) {
+  /*
+    A question in a dialog. Short answers sit in the footer, Cancel on the left and the main answer on the
+    right. Longer or more numerous answers become a list of full-width choices, each with an optional note
+    (`notes`, in the same order as `buttons`), and Cancel stays in the footer.
+  */
+  function ask({ message, detail = '', buttons = ['OK'], notes = null, defaultId = 0, cancelId = buttons.length - 1, danger = false, input = null }) {
     const dlg = $('ask');
     $('ask-title').textContent = message;
     $('ask-detail').textContent = detail;
@@ -39,18 +44,37 @@
       inputEl.placeholder = input.placeholder || '';
     }
     const row = $('ask-buttons');
+    const list = $('ask-choices');
     row.textContent = '';
+    list.textContent = '';
     let result = cancelId;
+    const choose = (i) => () => {
+      result = i;
+      dlg.close();
+    };
+    const asList = !!notes || buttons.length > 3 || buttons.some((label, i) => i !== cancelId && label.length > 18);
+    list.hidden = !asList;
     buttons.forEach((label, i) => {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = `big${i === defaultId ? (danger ? ' danger' : ' primary') : ''}`;
-      b.textContent = label;
-      b.addEventListener('click', () => {
-        result = i;
-        dlg.close();
-      });
-      row.append(b);
+      if (asList && i !== cancelId) {
+        b.className = `choice${i === defaultId ? ' primary' : ''}`;
+        const title = document.createElement('span');
+        title.className = 'choice-title';
+        title.textContent = label;
+        b.append(title);
+        if (notes && notes[i]) {
+          const note = document.createElement('small');
+          note.textContent = notes[i];
+          b.append(note);
+        }
+        list.append(b);
+      } else {
+        b.className = `big${i === defaultId ? (danger ? ' danger' : ' primary') : ''}`;
+        b.textContent = label;
+        row.append(b);
+      }
+      b.addEventListener('click', choose(i));
     });
     inputEl.onkeydown = (e) => {
       if (e.key === 'Enter') {
@@ -65,7 +89,7 @@
       if (input) {
         inputEl.focus();
         inputEl.select();
-      } else row.children[defaultId]?.focus();
+      } else (asList ? list.querySelector('.primary') : [...row.children].find((b) => b.classList.contains('primary') || b.classList.contains('danger')))?.focus();
     });
   }
 
@@ -95,6 +119,18 @@
     pop.style.top = `${top}px`;
     if (trigger) trigger.setAttribute('aria-expanded', 'true');
     if (document.body.classList.contains('kbd')) [...pop.querySelectorAll('button, input, select')].find((b) => b.offsetParent)?.focus();
+  }
+
+  // Every dialog has a close button in its corner (the same as Cancel, or Esc).
+  for (const d of document.querySelectorAll('dialog')) {
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'dialog-close';
+    x.title = 'Close (Esc)';
+    x.setAttribute('aria-label', 'Close');
+    x.innerHTML = '<svg class="ic"><use href="#i-close"/></svg>';
+    x.addEventListener('click', () => d.close());
+    d.prepend(x);
   }
 
   // ---------- Segmented controls (radio groups) ----------

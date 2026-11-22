@@ -15,7 +15,6 @@ function rowButton(cls, iconId, label) {
   b.innerHTML = icon(iconId);
   return b;
 }
-const delButton = (label) => rowButton('del', 'i-close', label);
 
 function renderSections() {
   const list = el.sectionList;
@@ -40,7 +39,7 @@ function renderSections() {
     const count = document.createElement('span');
     count.className = 'count';
     count.textContent = s.pages.length;
-    li.append(dye, name, count, rowButton('ren', 'i-edit', `Rename section ${s.title}`), delButton(`Delete section ${s.title}`));
+    li.append(dye, name, count, rowButton('more', 'i-more', `Download, rename, colour or delete ${s.title}`));
     list.append(li);
   });
   list.scrollTop = top; // drawing the list again keeps it where it was
@@ -86,7 +85,7 @@ async function deleteSection(i) {
   if (s.pages.some((p) => !Model.isBlank(p))) {
     const r = await ask({
       message: `Delete the section “${s.title}”?`,
-      detail: `Its ${plural(s.pages.length, 'page')} will be removed.`,
+      detail: `${plural(s.pages.length, 'page')} in it will be removed.`,
       buttons: ['Delete', 'Cancel'],
       danger: true,
     });
@@ -100,22 +99,16 @@ async function deleteSection(i) {
   renderSidebar();
 }
 
-function cycleSectionColor(i) {
-  const s = state.nb.sections[i];
-  const idx = Model.DYES.findIndex(([c]) => c === s.color);
-  s.color = Model.DYES[(idx + 1) % Model.DYES.length][0];
-  markDirty(null);
-  renderSections();
-}
-
 el.sectionList.addEventListener('click', (e) => {
   const li = e.target.closest('li');
   if (!li || e.target.tagName === 'INPUT') return;
   const i = Number(li.dataset.index);
-  if (e.target.closest('.dye')) cycleSectionColor(i);
-  else if (e.target.closest('.ren')) renameSection(i);
-  else if (e.target.closest('.del')) run('delete-section', () => deleteSection(i));
-  else showSection(i);
+  // The ⋯ button and the colour dot open the section's menu.
+  const opener = e.target.closest('.more, .dye');
+  if (opener) {
+    const r = opener.getBoundingClientRect();
+    openSectionMenu(i, r.left, r.bottom);
+  } else showSection(i);
 });
 el.sectionList.addEventListener('dblclick', (e) => {
   const li = e.target.closest('li');
@@ -140,6 +133,8 @@ function openSectionMenu(i, x, y) {
   $('section-dyes')
     .querySelectorAll('.swatch')
     .forEach((b) => b.setAttribute('aria-checked', String(b.dataset.color === s.color)));
+  const dye = Model.DYES.find(([c]) => c === s.color);
+  $('section-colour-name').textContent = dye ? `· ${dye[1]}` : '';
   openPopover($('section-menu'), { getBoundingClientRect: () => new DOMRect(x, y, 0, 0) }, 'left');
 }
 el.sectionList.addEventListener('contextmenu', (e) => {
@@ -157,6 +152,9 @@ $('section-menu').addEventListener('click', (e) => {
     markDirty(null);
     renderSections();
     closePopovers();
+  } else if (b.dataset.action === 'pdf') {
+    closePopovers();
+    run('export-pdf', () => exportPdf({ section: i }));
   } else if (b.dataset.action === 'rename') renameSection(i);
   else if (b.dataset.action === 'delete') run('delete-section', () => deleteSection(i));
 });
