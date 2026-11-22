@@ -17,8 +17,13 @@ fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ libraryDi
 app.setPath('userData', profile);
 dialog.showSaveDialog = async (_w, o) => ({ canceled: false, filePath: outFiles[o.filters[0].extensions[0]] });
 let nextOpen = null; // the file the next Open… picks
-dialog.showOpenDialog = async () => (nextOpen ? { canceled: false, filePaths: [nextOpen] } : { canceled: true, filePaths: [] });
+const pdfFolder = path.join(root, 'section-pdfs');
+dialog.showOpenDialog = async (_w, o) => {
+  if (o && o.properties && o.properties.includes('openDirectory')) return fs.mkdirSync(pdfFolder, { recursive: true }), { canceled: false, filePaths: [pdfFolder] };
+  return nextOpen ? { canceled: false, filePaths: [nextOpen] } : { canceled: true, filePaths: [] };
+};
 dialog.showMessageBox = async (_w, o) => {
+  if (/already in the folder/.test(o.message)) return { response: 0 }; // replace the section PDFs exported before
   report(false, 'no unexpected system dialogs', o.message);
   return { response: o.cancelId ?? 0 };
 };
@@ -602,12 +607,53 @@ group('export', async () => {
   equal('PDF of A4 pages only', pdfPages(), 1);
   await exportPdf('Include infinite pages');
   equal('PDF with the infinite page too', pdfPages(), 2);
+  // Each section as its own PDF, and this section only.
+  await js(`addSection(); document.activeElement.blur(); renameItem('section', 1, 'Second'); setTool('text'); 0`);
+  await typeText('In the second section');
+  const sectionPdfs = async () => {
+    await js(`run('export-pdf'); 0`);
+    await answer('Each section as its own PDF');
+    await answer('A4 pages only');
+    for (let i = 0; i < 100 && !(fs.existsSync(pdfFolder) && fs.readdirSync(pdfFolder).length >= 2); i++) await sleep(50);
+    await until('!busy', 5000);
+    return fs.existsSync(pdfFolder) ? fs.readdirSync(pdfFolder).sort() : [];
+  };
+  equal('each section becomes its own PDF', await sectionPdfs(), ['Export - Notes.pdf', 'Export - Second.pdf']);
+  const sheetsIn = (f) => (fs.readFileSync(path.join(pdfFolder, f), 'latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
+  equal('…with the pages of that section only', [sheetsIn('Export - Notes.pdf'), sheetsIn('Export - Second.pdf')], [1, 1]);
+  equal('exporting again replaces them instead of piling up copies', await sectionPdfs(), ['Export - Notes.pdf', 'Export - Second.pdf']);
+  fs.rmSync(outFiles.pdf, { force: true });
+  await js(`run('export-pdf'); 0`);
+  await answer('This section only');
+  for (let i = 0; i < 100 && !fs.existsSync(outFiles.pdf); i++) await sleep(50);
+  await sleep(100);
+  equal('this section only', pdfPages(), 1);
   await js(`run('export-png'); 0`);
   for (let i = 0; i < 100 && !fs.existsSync(outFiles.png); i++) await sleep(50);
   check('page image', fs.existsSync(outFiles.png));
   await js(`run('export-md'); 0`);
   for (let i = 0; i < 100 && !fs.existsSync(outFiles.md); i++) await sleep(50);
   check('Markdown', fs.existsSync(outFiles.md) && fs.readFileSync(outFiles.md, 'utf8').includes('Export me'));
+});
+
+group('paper colour and texture', async () => {
+  await fresh('Paper');
+  await js(`openSettings(); 0`);
+  check('the settings offer your own paper colour and five textures', await js(`!!document.getElementById('paper-custom') && document.querySelectorAll('#paper-textures .texture').length === 5`));
+  await js(`(() => { const c = document.getElementById('paper-custom'); c.value = '#dcefe4'; c.dispatchEvent(new Event('input')); c.dispatchEvent(new Event('change')); })(); 0`);
+  equal('your own paper colour is used on the page', await js(`getComputedStyle(el.sheet).backgroundColor`), 'rgb(220, 239, 228)');
+  await js(`document.querySelector('#paper-textures [data-value="linen"]').click(); document.getElementById('settings-dialog').close(); 0`);
+  check('a texture is laid on the paper', await js(`getComputedStyle(el.sheet).backgroundImage.startsWith('url("data:image/svg+xml')`));
+  undoKey();
+  check('undo takes back the texture', await until(`state.nb.paperTexture === 'none' && getComputedStyle(el.sheet).backgroundImage === 'none'`));
+  redoKey();
+  await until(`state.nb.paperTexture === 'linen'`);
+  await js('saveNotebook(false, true)');
+  const file = path.join(library, 'Paper.ntb');
+  await js(`(async () => { await leaveNotebook(); setNotebook(Model.newNotebook({ cover: 'kolam' }), null); await loadFile(await api.readNotebook(${JSON.stringify(file)})); })()`);
+  equal('both are saved with the notebook', await js('[state.nb.paperColor, state.nb.paperTexture]'), ['#dcefe4', 'linen']);
+  check('new notebooks start with the same paper', await js(`state.settings.paperColor === '#dcefe4' && state.settings.paperTexture === 'linen'`));
+  await js(`applySettings({ paperColor: 'white', paperTexture: 'none' }); 0`);
 });
 
 group('search', async () => {

@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('jotter', {
   listHistory: invoke('history:list'),
   readHistory: invoke('history:read'),
   exportPdf: invoke('export:pdf'),
+  exportPdfs: invoke('export:pdfs'),
   exportPng: invoke('export:png'),
   exportText: invoke('export:text'),
   print: invoke('export:print'),

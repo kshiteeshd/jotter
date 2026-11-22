@@ -39,18 +39,62 @@ function register({ ctxOf }) {
     return new RegExp(`\\.${ext}$`, 'i').test(res.filePath) ? res.filePath : `${res.filePath}.${ext}`;
   }
 
-  ipcMain.handle('export:pdf', async (e, { pages, suggestedName, background }) => {
+  const makePdf = (pages, background, texture) =>
+    withSheetWindow(printing.buildHtml(pages, background, null, texture), (w) =>
+      w.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, pageSize: 'A4', margins: { top: 0, bottom: 0, left: 0, right: 0 } })
+    );
+
+  ipcMain.handle('export:pdf', async (e, { pages, suggestedName, background, texture }) => {
     const ctx = ctxOf(e);
     const target = await askSavePath(ctx, 'Export as PDF', suggestedName, 'pdf', 'PDF Document');
     if (!target) return null;
     try {
-      const pdf = await withSheetWindow(printing.buildHtml(pages, background), (w) =>
-        w.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, pageSize: 'A4', margins: { top: 0, bottom: 0, left: 0, right: 0 } })
-      );
-      fs.writeFileSync(target, pdf);
+      fs.writeFileSync(target, await makePdf(pages, background, texture));
       return { path: target };
     } catch (err) {
       return { error: `Could not export the PDF.\n${err.message}` };
+    }
+  });
+
+  // One PDF per section, all in a folder you choose. Files already there with the same names are replaced
+  // only if you say so; otherwise the new ones get a number.
+  ipcMain.handle('export:pdfs', async (e, { files, background, texture }) => {
+    const ctx = ctxOf(e);
+    const list = (Array.isArray(files) ? files : []).slice(0, 500);
+    if (!list.length) return null;
+    const pick = await dialog.showOpenDialog(ctx.win, {
+      title: 'Choose a folder for the section PDFs',
+      defaultPath: app.getPath('documents'),
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (pick.canceled || !pick.filePaths[0]) return null;
+    const folder = pick.filePaths[0];
+    const names = list.map((f) => (String(f.name || 'Section').replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().replace(/[. ]+$/, '').slice(0, 150) || 'Section'));
+    const taken = names.filter((n) => fs.existsSync(path.join(folder, `${n}.pdf`)));
+    let replace = true;
+    if (taken.length) {
+      const r = await dialog.showMessageBox(ctx.win, {
+        type: 'question',
+        message: `${taken.length === 1 ? 'A PDF' : `${taken.length} PDFs`} with ${taken.length === 1 ? 'this name is' : 'these names are'} already in the folder.`,
+        detail: taken.slice(0, 6).map((n) => `${n}.pdf`).join('\n') + (taken.length > 6 ? '\n…' : ''),
+        buttons: ['Replace them', 'Keep both', 'Cancel'],
+        defaultId: 1,
+        cancelId: 2,
+      });
+      if (r.response === 2) return null;
+      replace = r.response === 0;
+    }
+    try {
+      const used = new Set();
+      for (let i = 0; i < list.length; i++) {
+        let target = path.join(folder, `${names[i]}.pdf`);
+        for (let n = 2; used.has(target.toLowerCase()) || (!replace && fs.existsSync(target)); n++) target = path.join(folder, `${names[i]} (${n}).pdf`);
+        used.add(target.toLowerCase());
+        fs.writeFileSync(target, await makePdf(list[i].pages, background, texture));
+      }
+      return { folder, count: list.length };
+    } catch (err) {
+      return { error: `Could not export the PDFs.\n${err.message}` };
     }
   });
 
@@ -70,7 +114,7 @@ function register({ ctxOf }) {
     }
   });
 
-  ipcMain.handle('export:png', async (e, { pages, suggestedName, background }) => {
+  ipcMain.handle('export:png', async (e, { pages, suggestedName, background, texture }) => {
     const ctx = ctxOf(e);
     const target = await askSavePath(ctx, 'Export Page as Image', suggestedName, 'png', 'PNG Image');
     if (!target) return null;
@@ -79,7 +123,7 @@ function register({ ctxOf }) {
       const files = [];
       for (let i = 0; i < count; i++) {
         const png = await withSheetWindow(
-          printing.buildHtml(pages, background, { page: 0, sheet: i }),
+          printing.buildHtml(pages, background, { page: 0, sheet: i }, texture),
           async (w) => {
             w.webContents.setZoomFactor(2);
             await new Promise((r) => setTimeout(r, 300));

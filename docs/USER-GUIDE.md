@@ -34,7 +34,7 @@ The switches in the middle of the top bar:
 
 - **Paged** gives A4 sheets. Sheets are separated by a visible gap with the sheet number; **Add a sheet** under the last one adds more room. PDF export splits pages exactly at the gaps.
 - **Infinite** gives one page that fills the window and grows as you scroll.
-- **Plain, Ruled, Grid, Dots, Kolam** set the paper. Paper colour is in Settings.
+- **Plain, Ruled, Grid, Dots, Kolam** set the paper. In **Settings → This notebook** you can choose the paper colour (four ready colours, or any colour of your own with the rainbow picker) and a **paper texture**: None, Grain, Linen, Recycled or Parchment. The colour and texture apply to the whole notebook and become the starting paper for new notebooks.
 
 ## Saving, versions and recovery
 
@@ -42,7 +42,7 @@ Notebooks save themselves a moment after every change. Every ten minutes of work
 
 ## Export and print
 
-**Export as PDF** (Ctrl+E) exports the whole notebook, one PDF page per A4 sheet, with the ink as sharp vector lines. If the notebook mixes A4 and infinite pages it asks whether to include the infinite ones (they are trimmed to what is on them and cut into A4 sheets) or export only the A4 pages; print asks the same. With a coloured paper it also asks whether the PDF background should be white or the paper colour. Settings also offers a page image (PNG), Markdown, print and *Save a copy*.
+**Export as PDF** (Ctrl+E) makes one PDF page per A4 sheet, with the ink as sharp vector lines. If the notebook has more than one section, it asks what to include: the **whole notebook** in one PDF, **each section as its own PDF** (you choose a folder; the files are named after the notebook and section, and if they are already there you can replace them or keep both), or **this section only**. If the pages mix A4 and infinite pages it asks whether to include the infinite ones (trimmed to what is on them and cut into A4 sheets); print asks the same. With a coloured or textured paper it also asks whether the PDF should be plain white or keep the paper colour and texture. Settings also offers a page image (PNG, with the paper's look), Markdown, print and *Save a copy*.
 
 ## View
 

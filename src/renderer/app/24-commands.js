@@ -6,7 +6,7 @@ async function createNotebook(cover, name = '') {
   const made = await api.libraryNew(name);
   if (made.error) return showError(made.error);
   const s = state.settings;
-  setNotebook(Model.newNotebook({ cover, paperColor: s.paperColor, paper: s.defaultPaper, mode: s.defaultMode }), made.path);
+  setNotebook(Model.newNotebook({ cover, paperColor: s.paperColor, paperTexture: s.paperTexture, paper: s.defaultPaper, mode: s.defaultMode }), made.path);
   await saveNotebook(false, true);
   touchRecent();
   if (!name) flash(`Created “${notebookName()}”. Click its name at the top to rename it.`);

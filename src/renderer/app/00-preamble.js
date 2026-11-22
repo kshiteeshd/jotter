@@ -70,7 +70,7 @@ const state = {
   userZoomed: false, // the page fits the window until you zoom yourself
   fullscreen: false,
   version: '',
-  settings: { theme: 'system', uiScale: 1, autosave: true, sidebar: true, paperColor: 'white', eraserMode: 'rub', defaultCover: 'kolam', defaultPaper: 'plain', defaultMode: 'paged', penOnly: false, historyLimit: 30 },
+  settings: { theme: 'system', uiScale: 1, autosave: true, sidebar: true, paperColor: 'white', paperTexture: 'none', eraserMode: 'rub', defaultCover: 'kolam', defaultPaper: 'plain', defaultMode: 'paged', penOnly: false, historyLimit: 30 },
   tools: {
     text: { color: '#1f1b18' },
     pen: { color: '#1f1b18', size: 3 },

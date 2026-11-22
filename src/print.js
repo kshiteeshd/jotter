@@ -7,6 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const Textures = require('./renderer/textures');
 
 const SHEET_W = 794; // A4 at 96 dpi
 const SHEET_H = 1122;
@@ -36,16 +37,17 @@ function sheets(pages, only) {
   return out;
 }
 
-function buildHtml(pages, background, only = null) {
+function buildHtml(pages, background, only = null, texture = 'none') {
   const css = fs.readFileSync(path.join(__dirname, 'renderer', 'content.css'), 'utf8');
   const bg = /^#[0-9a-f]{6}$/i.test(background) ? background : '#ffffff';
+  const grain = Textures.valid(texture) ? Textures.css(texture) : 'none';
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
 <style>
 ${css}
 @page { size: A4; margin: 0; }
 html, body { margin: 0; padding: 0; background: ${bg}; }
-.pdf-sheet { position: relative; width: ${SHEET_W}px; height: ${SHEET_H}px; overflow: hidden; break-after: page; background: ${bg}; isolation: isolate; }
+.pdf-sheet { position: relative; width: ${SHEET_W}px; height: ${SHEET_H}px; overflow: hidden; break-after: page; background-color: ${bg}; background-image: ${grain}; isolation: isolate; }
 .pdf-sheet:last-child { break-after: auto; }
 .pdf-sheet .note-content { position: absolute; left: 0; width: ${SHEET_W}px; transform-origin: 0 0; background-image: none; }
 .pdf-sheet .paper-bg { position: absolute; left: 0; transform-origin: 0 0; }

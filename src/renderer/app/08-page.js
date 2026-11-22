@@ -47,7 +47,8 @@ function loadPage(rebuildList = true, { scroll = null, fade = true } = {}) {
 
 function applyPaper() {
   const p = page();
-  el.sheet.style.setProperty('--paper', Model.PAPER_COLORS[state.nb.paperColor]);
+  el.sheet.style.setProperty('--paper', Model.paperHex(state.nb.paperColor));
+  el.sheet.style.setProperty('--texture', Textures.css(state.nb.paperTexture));
   el.editor.dataset.paper = p.paper;
   $('paper-bg').dataset.paper = p.paper;
   setSeg('paper-style', p.paper);
@@ -56,6 +57,15 @@ function applyPaper() {
   document
     .querySelectorAll('#paper-colors .swatch')
     .forEach((s) => s.setAttribute('aria-checked', String(s.dataset.value === state.nb.paperColor)));
+  const own = !Model.PAPER_COLORS[state.nb.paperColor];
+  $('paper-custom-wrap').setAttribute('aria-checked', String(own));
+  if (own) $('paper-custom').value = Model.paperHex(state.nb.paperColor);
+  document
+    .querySelectorAll('#paper-textures .texture')
+    .forEach((b) => {
+      b.setAttribute('aria-checked', String(b.dataset.value === (state.nb.paperTexture || 'none')));
+      b.style.backgroundColor = Model.paperHex(state.nb.paperColor);
+    });
 }
 
 // An empty page shows a faint motif.

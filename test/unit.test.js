@@ -49,6 +49,14 @@ test('the notebook writer makes standard zip files that reuse unchanged pages', 
   assert.deepEqual(fs.readdirSync(tmp).filter((f) => f.endsWith('.tmp')), []);
 });
 
+test('PDFs and prints carry the paper texture when asked, and nothing unknown', () => {
+  const printing = require('../src/print');
+  const page = [{ sheets: 1, paper: 'ruled', html: '<div>x</div>', ink: [null] }];
+  assert.match(printing.buildHtml(page, '#fbf6e6', null, 'linen'), /background-image: url\("data:image\/svg\+xml/);
+  assert.match(printing.buildHtml(page, '#fbf6e6', null, 'nonsense'), /background-image: none/);
+  assert.match(printing.buildHtml(page, 'red', null), /background-color: #ffffff/);
+});
+
 test('old JSON notebooks are read as text', () => {
   const file = path.join(tmp, 'old.ntb');
   fs.writeFileSync(file, '{"format":"jotter-notebook","pages":[]}');

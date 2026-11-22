@@ -13,6 +13,10 @@
 
   const PAPER_STYLES = ['plain', 'ruled', 'grid', 'dotted', 'kolam'];
   const PAPER_COLORS = { white: '#ffffff', cream: '#fbf6e6', sepia: '#f1e3c6', grey: '#e9eaec' };
+  // A notebook's paper colour is one of the colours above (by name) or any colour of your own ('#rrggbb').
+  const paperOk = (v) => !!PAPER_COLORS[v] || /^#[0-9a-f]{6}$/i.test(v || '');
+  const paperHex = (v) => PAPER_COLORS[v] || (/^#[0-9a-f]{6}$/i.test(v || '') ? v.toLowerCase() : PAPER_COLORS.white);
+  const textureOk = (v) => !!(root.Textures && root.Textures.valid(v)) && v !== 'none';
 
   // Natural-dye colours: used for sections and, slightly brighter, for ink.
   const DYES = [
@@ -93,12 +97,13 @@
     return { id: uid(), title, color, pages: [] };
   }
 
-  function newNotebook({ cover, paperColor, paper, mode } = {}) {
+  function newNotebook({ cover, paperColor, paperTexture, paper, mode } = {}) {
     const section = newSection('Notes');
     section.pages.push(newPage('Page 1', { paper, mode }));
     return {
       created: new Date().toISOString(),
-      paperColor: PAPER_COLORS[paperColor] ? paperColor : 'white',
+      paperColor: paperOk(paperColor) ? paperColor : 'white',
+      paperTexture: textureOk(paperTexture) ? paperTexture : 'none',
       cover,
       sections: [section],
     };
@@ -183,7 +188,8 @@
     for (const s of sections) if (!s.pages.length) s.pages.push(newPage('Page 1'));
     return {
       created: typeof meta.created === 'string' ? meta.created : new Date().toISOString(),
-      paperColor: PAPER_COLORS[meta.paperColor] ? meta.paperColor : 'white',
+      paperColor: paperOk(meta.paperColor) ? meta.paperColor : 'white',
+      paperTexture: textureOk(meta.paperTexture) ? meta.paperTexture : 'none',
       cover: coverIds.includes(meta.cover) ? meta.cover : coverIds[0],
       sections,
     };
@@ -264,6 +270,7 @@
       created: nb.created,
       modified: new Date().toISOString(),
       paperColor: nb.paperColor,
+      paperTexture: nb.paperTexture || 'none',
       cover: nb.cover,
       ...extra,
       sections: nb.sections.map((sec) => ({ title: sec.title, color: sec.color, pages: sec.pages.map((p) => `pages/${p.id}.json`) })),
@@ -354,6 +361,7 @@
   root.Model = {
     PAPER_STYLES,
     PAPER_COLORS,
+    paperHex,
     DYES,
     INKS,
     TEMPLATES,

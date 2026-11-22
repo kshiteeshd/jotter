@@ -21,6 +21,7 @@ function snapshot() {
   const nb = state.nb;
   return {
     paperColor: nb.paperColor,
+    paperTexture: nb.paperTexture,
     cover: nb.cover,
     sections: nb.sections.map((s) => ({ ...s, pages: s.pages.map((p) => ({ ...p })) })),
   };
@@ -120,8 +121,9 @@ function restoreSnapshot(snap) {
     const shown = page();
     const view = { top: el.workspace.scrollTop, left: el.workspace.scrollLeft };
     const lists = { sections: el.sectionList.scrollTop, pages: el.pageList.scrollTop };
-    const before = { sidebar: sidebarSig(nb), paperColor: nb.paperColor, cover: nb.cover, sec: state.secIdx, page: state.pageIdx };
+    const before = { sidebar: sidebarSig(nb), paperColor: nb.paperColor, paperTexture: nb.paperTexture, cover: nb.cover, sec: state.secIdx, page: state.pageIdx };
     nb.paperColor = snap.paperColor;
+    nb.paperTexture = snap.paperTexture;
     nb.cover = snap.cover;
     nb.sections = snap.sections.map((s) => ({ ...s, pages: s.pages.map((p) => ({ ...p, rev: ++revSeq })) }));
 
@@ -151,7 +153,7 @@ function restoreSnapshot(snap) {
         }
       }
       if (now.title !== shown.title) el.pageTitle.value = now.title;
-      if (now.mode !== shown.mode || now.paper !== shown.paper || nb.paperColor !== before.paperColor) applyPaper();
+      if (now.mode !== shown.mode || now.paper !== shown.paper || nb.paperColor !== before.paperColor || nb.paperTexture !== before.paperTexture) applyPaper();
       if (now.mode !== shown.mode || now.sheets !== shown.sheets) layoutSheets();
       if (now.strokes !== shown.strokes) redrawInk();
       if (now.html !== shown.html) now.mode === 'paged' ? growToFit() : ensureRoom(textBottom(el.editor));

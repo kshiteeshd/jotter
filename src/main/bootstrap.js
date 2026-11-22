@@ -30,6 +30,7 @@ const DEFAULTS = {
   uiScale: 1,
   sidebar: true,
   paperColor: 'white',
+  paperTexture: 'none',
   eraserMode: 'rub',
   defaultCover: 'kolam',
   defaultPaper: 'plain',

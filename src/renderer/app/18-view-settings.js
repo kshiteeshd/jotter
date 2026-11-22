@@ -115,8 +115,44 @@ function openSettings() {
 for (const [key, hex] of Object.entries(Model.PAPER_COLORS)) {
   const b = makeSwatch(hex, key[0].toUpperCase() + key.slice(1), 'value');
   b.dataset.value = key;
-  $('paper-colors').append(b);
+  $('paper-colors').insertBefore(b, $('paper-custom-wrap'));
 }
+// Your own paper colour: shown on the page while you choose, kept (and undoable) when you settle on it.
+$('paper-custom').addEventListener('input', (e) => {
+  if (!state.nb) return;
+  state.nb.paperColor = e.target.value.toLowerCase();
+  applyPaper();
+});
+$('paper-custom').addEventListener('change', (e) => {
+  if (!state.nb) return;
+  state.nb.paperColor = e.target.value.toLowerCase();
+  applyPaper();
+  markDirty(null);
+  applySettings({ paperColor: state.nb.paperColor });
+});
+// Paper textures: each choice shows a sample of itself on the notebook's paper colour.
+for (const t of Textures.list) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'texture';
+  b.dataset.value = t.id;
+  b.title = t.name;
+  b.setAttribute('role', 'radio');
+  b.setAttribute('aria-label', `${t.name} texture`);
+  b.style.setProperty('--texture', Textures.css(t.id));
+  const label = document.createElement('span');
+  label.textContent = t.name;
+  b.append(label);
+  $('paper-textures').append(b);
+}
+$('paper-textures').addEventListener('click', (e) => {
+  const b = e.target.closest('.texture');
+  if (!b || !state.nb || (state.nb.paperTexture || 'none') === b.dataset.value) return;
+  state.nb.paperTexture = b.dataset.value;
+  applyPaper();
+  markDirty(null);
+  applySettings({ paperTexture: b.dataset.value });
+});
 $('paper-colors').addEventListener('click', (e) => {
   const key = e.target.dataset.value;
   if (!key || !state.nb || state.nb.paperColor === key) return;

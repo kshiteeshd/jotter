@@ -353,7 +353,8 @@
       <section id="set-notebook">
         <h3>This notebook</h3>
         <div class="set-row"><span>Cover<small id="set-cover-name"></small></span><button class="big" type="button" data-cmd="change-cover">Change…</button></div>
-        <div class="set-row"><span>Paper colour</span><div id="paper-colors" role="radiogroup" aria-label="Paper colour"></div></div>
+        <div class="set-row"><span>Paper colour<small>Or pick any colour of your own.</small></span><div id="paper-colors" role="radiogroup" aria-label="Paper colour"><label class="custom-color" id="paper-custom-wrap" title="Your own paper colour"><input type="color" id="paper-custom" value="#fff8e7" aria-label="Your own paper colour"></label></div></div>
+        <div class="set-row"><span>Paper texture</span><div id="paper-textures" role="radiogroup" aria-label="Paper texture"></div></div>
         <div class="set-row"><span>Earlier versions<small>Kept automatically while you work.</small></span><button class="big" type="button" data-cmd="history">Version history…</button></div>
         <div class="set-row"><span>Export and print<small>Export as PDF is also in the top bar (Ctrl+E).</small></span><span class="set-actions">
           <button class="big" type="button" data-cmd="export-png">Page image</button>
@@ -463,6 +464,7 @@
   <div id="ring"></div>
   <div id="measure" class="note-content" aria-hidden="true"></div>
   <script src="ink.js"></script>
+  <script src="textures.js"></script>
   <script src="model.js"></script>
   <script src="covers.js"></script>
   <script src="ui.js"></script>
