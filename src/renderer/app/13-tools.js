@@ -315,8 +315,10 @@ function syncDockHiding() {
 }
 
 // Is the point at the edge the bar is docked to (within the page area)?
+let areaRect = null; // measured again when the page area changes size
+new ResizeObserver(() => (areaRect = null)).observe($('page-area'));
 function atDockEdge(x, y) {
-  const a = $('page-area').getBoundingClientRect();
+  const a = areaRect || (areaRect = $('page-area').getBoundingClientRect());
   const zone = 24;
   if (x < a.left || x > a.right || y < a.top || y > a.bottom) return false;
   const side = document.body.dataset.dock;
@@ -326,20 +328,29 @@ function atDockEdge(x, y) {
   return y >= a.bottom - zone;
 }
 
+// Where the pointer is, looked at once a frame (a pen reports far more often), never mid-stroke.
+let dockPointer = null;
+function checkDockPointer() {
+  const { x, y } = dockPointer;
+  dockPointer = null;
+  if (!dockHides() || state.view !== 'editor' || current || pan) return;
+  if (document.body.classList.contains('dock-hidden')) {
+    if (atDockEdge(x, y)) setDockHidden(false);
+    return;
+  }
+  const r = dockBar.getBoundingClientRect();
+  const near = x > r.left - 32 && x < r.right + 32 && y > r.top - 32 && y < r.bottom + 32;
+  if (near) {
+    clearTimeout(dockTimer);
+    dockTimer = 0;
+  } else hideDockSoon();
+}
 document.addEventListener(
   'pointermove',
   (e) => {
     if (!dockHides() || state.view !== 'editor' || current || pan) return;
-    if (document.body.classList.contains('dock-hidden')) {
-      if (atDockEdge(e.clientX, e.clientY)) setDockHidden(false);
-      return;
-    }
-    const r = dockBar.getBoundingClientRect();
-    const near = e.clientX > r.left - 32 && e.clientX < r.right + 32 && e.clientY > r.top - 32 && e.clientY < r.bottom + 32;
-    if (near) {
-      clearTimeout(dockTimer);
-      dockTimer = 0;
-    } else hideDockSoon();
+    if (!dockPointer) requestAnimationFrame(checkDockPointer);
+    dockPointer = { x: e.clientX, y: e.clientY };
   },
   { passive: true }
 );

@@ -218,6 +218,7 @@ function extendPage() {
 let viewQueued = false;
 function onViewportChange() {
   activeScale = null;
+  ringScale = 0;
   if (viewQueued) return;
   viewQueued = true;
   requestAnimationFrame(() => {
@@ -232,5 +233,5 @@ function onViewportChange() {
   });
 }
 el.workspace.addEventListener('scroll', onViewportChange, { passive: true });
-new ResizeObserver(() => { activeScale = null; onViewportChange(); }).observe(el.workspace);
+new ResizeObserver(() => onViewportChange()).observe(el.workspace);
 

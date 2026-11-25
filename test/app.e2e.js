@@ -905,6 +905,41 @@ group('tool bar hides when not in use', async () => {
   check('pinned, the bar stays', await js(`!document.body.classList.contains('dock-hidden') && !state.settings.dockAutoHide`));
 });
 
+group('smooth pen pointer', async () => {
+  await fresh('Pointer');
+  await js(`setTool('pen'); setSize(4); 0`);
+  const at = await js(`(() => { const r = el.sheet.getBoundingClientRect(); return { x: Math.round(r.left + 300), y: Math.round(r.top + 300) }; })()`);
+  wc.sendInputEvent({ type: 'mouseMove', x: at.x, y: at.y });
+  await frame();
+  // Count every measurement of the page while the pointer moves about.
+  await js(`(() => { window.__reads = 0; const g = Element.prototype.getBoundingClientRect; window.__g = g; Element.prototype.getBoundingClientRect = function () { window.__reads++; return g.call(this); }; })(); 0`);
+  for (let i = 1; i <= 60; i++) {
+    wc.sendInputEvent({ type: 'mouseMove', x: at.x + i * 3, y: at.y + Math.round(Math.sin(i / 4) * 20) });
+    if (i % 6 === 0) await sleep(8);
+  }
+  await frame();
+  const reads = await js(`(() => { Element.prototype.getBoundingClientRect = window.__g; return window.__reads; })()`);
+  check('following the pointer measures nothing on the page', reads <= 2, `${reads} measurements for 60 moves`);
+  const last = { x: at.x + 180, y: at.y + Math.round(Math.sin(15) * 20) };
+  const ring = await js(`(() => { const r = el.ring.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, shown: getComputedStyle(el.ring).display !== 'none' }; })()`);
+  check('the nib sits exactly on the pointer', ring.shown && Math.abs(ring.x - last.x) < 1 && Math.abs(ring.y - last.y) < 1, JSON.stringify({ ring, last }));
+  check('the nib has a layer of its own', await js(`getComputedStyle(el.ring).willChange.includes('transform')`));
+  await js(`run('zoom-in'); 0`);
+  await frame();
+  wc.sendInputEvent({ type: 'mouseMove', x: at.x + 10, y: at.y + 10 });
+  await frame();
+  equal('after zooming, the nib is the new size of the line', await js(`Math.round(el.ring.getBoundingClientRect().width * 100) / 100`), await js(`Math.round(Math.max(1.5, state.tools.pen.size / sheetScale().k) * 100) / 100`));
+  await js(`run('zoom-reset'); 0`);
+  await frame();
+  // A pen moving onto the tool bar: the system pointer takes over, there are never two.
+  const leave = (x, y) => js(`(() => { el.inkLayer.dispatchEvent(new PointerEvent('pointerleave', { pointerId: ringPointer ?? 1, pointerType: 'pen', clientX: ${x}, clientY: ${y} })); return getComputedStyle(el.ring).display !== 'none'; })()`);
+  wc.sendInputEvent({ type: 'mouseMove', x: at.x, y: at.y });
+  await frame();
+  check('a pen lifted over the page keeps its nib in place', await leave(at.x, at.y));
+  const bar = await js(`(() => { const r = document.querySelector('.tool[data-tool="pen"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`);
+  check('a pen moving onto the tool bar hides the nib', !(await leave(bar.x, bar.y)));
+});
+
 group('keeping your work safe', async () => {
   const format = require('../src/format');
   const fileOf = (name) => path.join(library, `${name}.ntb`);

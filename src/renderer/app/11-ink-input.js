@@ -1,6 +1,7 @@
 // ---------- Ink input ----------
 
 let activeScale = null; // cached during a gesture to avoid per-event layout reads
+let ringScale = 0; // the nib's size factor (page units per screen pixel), kept until the view changes
 function gestureScale() {
   if (!activeScale) activeScale = sheetScale();
   return activeScale;
@@ -94,12 +95,6 @@ function liveStroke(c) {
     else d += (d ? '' : m) + q;
   }
   if (d) markup += `<path d="${d}"/>`;
-  // Where the pen is about to be (the system's prediction), drawn ahead so the line keeps up with the
-  // nib; it is replaced by the real points as they arrive and never kept.
-  if (c.predicted && c.predicted.length && !c.straight) {
-    const w = liveWidth(c, n - 1);
-    markup += `<path d="M${pts[n * 2 - 2]} ${pts[n * 2 - 1]}L${c.predicted.join(' ')}"${w !== null ? ` stroke-width="${w}"` : ''}/>`;
-  }
   L.tail.innerHTML = markup;
 }
 
@@ -258,7 +253,6 @@ function flushInkMove() {
   if (!batch || !current || batch.pointerId !== current.pointerId) return;
   if (!activeScale) activeScale = sheetScale();
   for (const ev of batch.events) addPoint(ev, activeScale);
-  current.predicted = (current.tool === 'pen' || current.tool === 'marker') && batch.predicted ? batch.predicted.flatMap((ev) => toSheetPoint(ev, activeScale)) : null;
   if (current.tool === 'lasso') drawLasso();
   else updateLive();
 }
@@ -271,7 +265,7 @@ el.inkLayer.addEventListener('pointermove', (e) => {
     return;
   }
   if (selDrag) return moveSelection(e);
-  moveRing(e);
+  moveRing(e); // also from the raw updates (below), sooner; following it twice costs nothing
   if (!current || e.pointerId !== current.pointerId) return;
   if (e.pointerType === 'pen') lastPen = Date.now();
   const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
@@ -280,8 +274,6 @@ el.inkLayer.addEventListener('pointermove', (e) => {
   const list = usable ? events : [e];
   if (pendingInk && pendingInk.pointerId === e.pointerId) pendingInk.events.push(...list);
   else pendingInk = { pointerId: e.pointerId, events: list.slice() };
-  const ahead = e.getPredictedEvents ? e.getPredictedEvents() : [];
-  pendingInk.predicted = ahead.length ? ahead.slice(0, 2) : null;
   if (!inkFrame) inkFrame = requestAnimationFrame(flushInkMove);
 });
 
@@ -331,11 +323,15 @@ el.inkLayer.addEventListener('pointercancel', finishGesture);
 window.addEventListener('pointerup', finishGesture);
 window.addEventListener('pointercancel', finishGesture);
 el.inkLayer.addEventListener('pointerenter', moveRing);
+// Raw pointer updates arrive as soon as the pen moves, not with the next frame: the nib keeps up with it.
+const RAW_POINTER = 'onpointerrawupdate' in window;
+if (RAW_POINTER) el.inkLayer.addEventListener('pointerrawupdate', (e) => !pan && !selDrag && moveRing(e), { passive: true });
 el.inkLayer.addEventListener('pointerleave', (e) => {
   if (ringPointer !== null && e.pointerId !== ringPointer) return; // another contact (say, a resting palm) left
   // A pen lifted out of the tablet's range "leaves" the page too, between every word. Its nib stays where
-  // it was instead of blinking off; it goes only when the pen really moves off the page.
-  if (e.pointerType === 'pen' && insidePage(e.clientX, e.clientY)) return;
+  // it was instead of blinking off. It goes when the pen really moves off the page, or onto something lying
+  // over it (the tool bar, a menu), where the system pointer takes over.
+  if (e.pointerType === 'pen' && stillOverPage(e.clientX, e.clientY)) return;
   hideRing();
 });
 window.addEventListener('blur', hideRing);
@@ -347,31 +343,44 @@ el.inkLayer.addEventListener('mousedown', (e) => {
 // Drawing tools show their nib instead of the system pointer: a dot of the pen's colour and size,
 // a translucent marker tip, or the outline of the eraser.
 // The nib follows one pointer at a time: the one that last moved over the page.
+/*
+  The nib is drawn on a layer of its own, and a move changes only its position: its size, colour and
+  shape are set when they change, and nothing is measured while it moves (the page's scale is kept until
+  the view changes). So following the pen costs almost nothing, at any rate the pen reports.
+*/
 let ringPointer = null;
+const ringLook = { tool: '', color: '', d: 0, shown: false };
 function hideRing() {
-  el.ring.style.display = 'none';
+  if (ringLook.shown) el.ring.style.display = 'none';
+  ringLook.shown = false;
   ringPointer = null;
 }
-function insidePage(x, y) {
-  const a = el.inkLayer.getBoundingClientRect();
-  const b = el.workspace.getBoundingClientRect();
-  return x > Math.max(a.left, b.left) && x < Math.min(a.right, b.right) && y > Math.max(a.top, b.top) && y < Math.min(a.bottom, b.bottom);
+// Is the page itself (not the tool bar or a menu over it) under this point?
+function stillOverPage(x, y) {
+  const hit = document.elementFromPoint(x, y);
+  return !!hit && (hit === el.inkLayer || el.inkLayer.contains(hit));
 }
 
 function moveRing(e) {
   const tool = state.tool;
   if (!['pen', 'marker', 'eraser'].includes(tool) || spaceDown || e.pointerType === 'touch') return;
-  const s = activeScale || sheetScale();
-  if (!s) return;
+  if (!ringScale) {
+    const s = activeScale || sheetScale();
+    if (!s) return;
+    ringScale = s.k;
+  }
   const t = state.tools[tool];
-  // Pointer/nib preview matches the tool's actual stroke size on screen.
-  const d = Math.max(1.5, t.size / s.k);
+  // The nib matches the tool's actual stroke size on screen.
+  const d = Math.max(1.5, t.size / ringScale);
   const st = el.ring.style;
-  el.ring.dataset.tool = tool;
-  if (t.color) st.setProperty('--ring', t.color);
+  if (ringLook.tool !== tool) el.ring.dataset.tool = ringLook.tool = tool;
+  if (t.color && ringLook.color !== t.color) st.setProperty('--ring', (ringLook.color = t.color));
+  if (ringLook.d !== d) st.width = st.height = `${(ringLook.d = d)}px`;
+  if (!ringLook.shown) {
+    st.display = 'block';
+    ringLook.shown = true;
+  }
   ringPointer = e.pointerId;
-  st.display = 'block';
-  st.width = st.height = `${d}px`;
-  st.transform = `translate(${e.clientX - d / 2}px, ${e.clientY - d / 2}px)`;
+  st.transform = `translate3d(${e.clientX - d / 2}px, ${e.clientY - d / 2}px, 0)`;
 }
 
