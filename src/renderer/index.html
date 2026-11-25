@@ -199,7 +199,10 @@
           </div>
         </div>
         <div class="dock-main">
-          <button class="btn icon" id="btn-dock-grip" title="Drag to dock the tool bar to another edge" aria-label="Move the tool bar"><svg class="ic"><use href="#i-grip"/></svg></button>
+          <div class="dock-head">
+            <button class="btn icon" id="btn-dock-grip" title="Drag to dock the tool bar to another edge" aria-label="Move the tool bar"><svg class="ic"><use href="#i-grip"/></svg></button>
+            <button class="btn icon" id="btn-dock-pin" title="Keep the tool bar shown" aria-label="Keep the tool bar shown" aria-pressed="false"><svg class="ic"><use href="#i-pin"/></svg></button>
+          </div>
           <button class="btn icon" id="btn-rail" data-cmd="toggle-rail" title="Hide tool options" aria-label="Hide tool options" aria-expanded="true"><svg class="ic"><use href="#i-chevron"/></svg></button>
           <span class="dock-sep" aria-hidden="true"></span>
         <div class="tools" id="tools" role="radiogroup" aria-label="Tool">
@@ -221,6 +224,8 @@
         </div>
       </div>
       <div id="dock-ghost" aria-hidden="true"></div>
+      <!-- While the tool bar is hidden, a small tab marks its edge; pointing at the edge (or the tab) brings it back. -->
+      <button id="dock-peek" type="button" title="Show the tool bar" aria-label="Show the tool bar"><i></i><i></i></button>
     </div>
 
     <main id="home">
@@ -395,6 +400,7 @@
       <section>
         <h3>Pen and touch</h3>
         <label class="set-row"><span>Draw with the pen only<small>Fingers scroll the page instead of drawing.</small></span><input type="checkbox" class="switch" id="set-penonly"></label>
+        <label class="set-row"><span>Hide the tool bar when not in use<small>It slides away and comes back when you point at its edge.</small></span><input type="checkbox" class="switch" id="set-dockhide"></label>
       </section>
     </div>
     <div class="dialog-buttons">

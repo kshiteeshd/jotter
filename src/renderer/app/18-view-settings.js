@@ -68,6 +68,7 @@ function syncSettingsUi() {
   document.body.classList.toggle('no-sidebar', !s.sidebar);
   document.body.classList.toggle('pen-only', s.penOnly);
   $('btn-sidebar').setAttribute('aria-pressed', String(!!s.sidebar));
+  syncDockHiding();
 }
 
 async function applySettings(patch) {
@@ -92,6 +93,7 @@ for (const g of Covers.groups) {
 $('set-cover').addEventListener('change', (e) => applySettings({ defaultCover: e.target.value }));
 $('set-paper').addEventListener('change', (e) => applySettings({ defaultPaper: e.target.value }));
 $('set-penonly').addEventListener('change', (e) => applySettings({ penOnly: e.target.checked }));
+$('set-dockhide').addEventListener('change', (e) => applySettings({ dockAutoHide: e.target.checked }));
 $('set-history').addEventListener('change', (e) => applySettings({ historyLimit: Number(e.target.value) }));
 
 $('settings-dialog').addEventListener(

@@ -239,3 +239,83 @@ function nearestSide(x, y) {
     setDockSide(side);
   });
 })();
+
+// ---------- The tool bar hides when not in use ----------
+
+/*
+  With "hide when not in use" on (the pin off), the tool bar slides off its edge a moment after the
+  pointer leaves it, or as soon as you start writing, leaving a small tab at that edge. Pointing at the
+  edge, or at the tab, brings it back. It stays while you are using it: the pointer over it, the keyboard
+  in it, or dragging it to another edge. The page does not keep room for it meanwhile, so nothing moves
+  as it comes and goes.
+*/
+const dockBar = $('dock');
+let dockTimer = 0;
+let slideTimer = 0;
+const dockHides = () => !!state.settings.dockAutoHide;
+
+function setDockHidden(hidden) {
+  clearTimeout(dockTimer);
+  dockTimer = 0;
+  if (document.body.classList.contains('dock-hidden') === hidden) return;
+  clearTimeout(slideTimer);
+  document.body.classList.add('dock-sliding');
+  slideTimer = setTimeout(() => document.body.classList.remove('dock-sliding'), 320);
+  document.body.classList.toggle('dock-hidden', hidden);
+}
+function dockInUse() {
+  const keyboard = document.body.classList.contains('kbd') && dockBar.contains(document.activeElement); // not a button just clicked
+  return dockBar.matches(':hover') || keyboard || document.body.classList.contains('dock-dragging');
+}
+function hideDockSoon(ms = 900) {
+  if (!dockHides() || dockTimer || document.body.classList.contains('dock-hidden')) return;
+  dockTimer = setTimeout(() => {
+    dockTimer = 0;
+    if (dockHides() && state.view === 'editor' && !dockInUse()) setDockHidden(true);
+  }, ms);
+}
+function syncDockHiding() {
+  const on = dockHides();
+  document.body.classList.toggle('dock-autohide', on);
+  $('btn-dock-pin').setAttribute('aria-pressed', String(!on));
+  $('set-dockhide').checked = on;
+  if (!on) setDockHidden(false);
+  else hideDockSoon(1500);
+  onViewportChange();
+}
+
+// Is the point at the edge the bar is docked to (within the page area)?
+function atDockEdge(x, y) {
+  const a = $('page-area').getBoundingClientRect();
+  const zone = 24;
+  if (x < a.left || x > a.right || y < a.top || y > a.bottom) return false;
+  const side = document.body.dataset.dock;
+  if (side === 'right') return x >= a.right - zone;
+  if (side === 'left') return x <= a.left + zone;
+  if (side === 'top') return y <= a.top + zone;
+  return y >= a.bottom - zone;
+}
+
+document.addEventListener(
+  'pointermove',
+  (e) => {
+    if (!dockHides() || state.view !== 'editor' || current || pan) return;
+    if (document.body.classList.contains('dock-hidden')) {
+      if (atDockEdge(e.clientX, e.clientY)) setDockHidden(false);
+      return;
+    }
+    const r = dockBar.getBoundingClientRect();
+    const near = e.clientX > r.left - 32 && e.clientX < r.right + 32 && e.clientY > r.top - 32 && e.clientY < r.bottom + 32;
+    if (near) {
+      clearTimeout(dockTimer);
+      dockTimer = 0;
+    } else hideDockSoon();
+  },
+  { passive: true }
+);
+// Starting to write puts it away at once.
+el.inkLayer.addEventListener('pointerdown', () => dockHides() && !dockInUse() && setDockHidden(true), true);
+$('dock-peek').addEventListener('click', () => setDockHidden(false));
+$('dock-peek').addEventListener('pointerenter', () => setDockHidden(false));
+$('btn-dock-pin').addEventListener('click', () => applySettings({ dockAutoHide: !dockHides() }));
+dockBar.addEventListener('focusin', () => document.body.classList.contains('kbd') && setDockHidden(false));

@@ -13,7 +13,7 @@ const profile = path.join(root, 'profile');
 const library = path.join(root, 'library');
 const outFiles = { pdf: path.join(root, 'out.pdf'), png: path.join(root, 'out.png'), md: path.join(root, 'out.md'), ntb: path.join(root, 'copy.ntb') };
 fs.mkdirSync(profile, { recursive: true });
-fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ libraryDir: library, welcomed: true }));
+fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ libraryDir: library, welcomed: true, dockAutoHide: false }));
 app.setPath('userData', profile);
 dialog.showSaveDialog = async (_w, o) => ({ canceled: false, filePath: outFiles[o.filters[0].extensions[0]] });
 let nextOpen = null; // the file the next Open… picks
@@ -33,6 +33,7 @@ require('../src/main.js');
 // ---------- A small test runner ----------
 const only = process.argv.slice(2).filter((a) => !a.startsWith('-') && !a.endsWith('.js'));
 const shots = process.env.JOTTER_SHOTS;
+if (shots) fs.mkdirSync(shots, { recursive: true });
 const groups = [];
 const group = (name, fn) => groups.push({ name, fn });
 let passed = 0;
@@ -760,8 +761,9 @@ group('layout at every size and edge', async () => {
     win.setSize(w, h);
     for (const side of ['right', 'left', 'top', 'bottom']) {
       await js(`setDockSide('${side}'); 0`);
-      await until('true');
-      await sleep(60);
+      // The page refits to the new window on the next frame, which an off-screen test window can delay.
+      await until(`Math.abs(state.zoom - fitZoom()) < 0.006`, 2000);
+      await frame();
       const bad = await js(`(() => {
         const R = (e) => (typeof e === 'string' ? document.querySelector(e) : e).getBoundingClientRect();
         const over = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
@@ -803,6 +805,55 @@ group('layout at every size and edge', async () => {
   check('zoom in', await until('state.zoom > 1'));
   await js(`run('zoom-reset'); 0`);
   check('zoom reset fits again', await until('state.zoom === 1'));
+});
+
+group('tool bar hides when not in use', async () => {
+  await fresh('Hide');
+  const move = async (x, y) => {
+    wc.sendInputEvent({ type: 'mouseMove', x: Math.round(x), y: Math.round(y) });
+    await frame();
+  };
+  const area = await js(`(() => { const r = document.getElementById('page-area').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; })()`);
+  const mid = { x: (area.left + area.right) / 2, y: (area.top + area.bottom) / 2 };
+  const sheetAt = () => js(`Math.round(el.sheet.getBoundingClientRect().left)`);
+  await js(`setDockSide('right'); applySettings({ dockAutoHide: true }); 0`);
+  await sleep(100);
+  check('the pin button is off when the bar hides', await js(`document.getElementById('btn-dock-pin').getAttribute('aria-pressed') === 'false'`));
+  const before = await sheetAt();
+  await move(mid.x, mid.y);
+  await move(mid.x + 5, mid.y);
+  check('the bar slides away when the pointer leaves it', await until(`document.body.classList.contains('dock-hidden')`, 3000));
+  check('…leaving a small tab at its edge', await until(`getComputedStyle(document.getElementById('dock-peek')).display !== 'none'`));
+  await sleep(350);
+  if (shots) fs.writeFileSync(path.join(shots, 'tool-bar-hidden-right.png'), (await wc.capturePage()).toPNG());
+  check('…and is really off the page area', await js(`document.getElementById('dock').getBoundingClientRect().left >= document.getElementById('page-area').getBoundingClientRect().right - 2`));
+  equal('the page does not move as the bar hides', await sheetAt(), before);
+  await move(area.right - 8, mid.y);
+  check('pointing at the edge brings it back', await until(`!document.body.classList.contains('dock-hidden')`, 1000));
+  equal('…and the page still does not move', await sheetAt(), before);
+  await move(mid.x, mid.y);
+  await until(`document.body.classList.contains('dock-hidden')`, 3000);
+  await js(`document.getElementById('dock-peek').click(); 0`);
+  check('clicking the tab brings it back', await js(`!document.body.classList.contains('dock-hidden')`));
+  await js(`setTool('pen'); 0`);
+  await drag(wave(300));
+  check('starting to write puts it away', await js(`document.body.classList.contains('dock-hidden')`));
+  for (const side of ['left', 'top', 'bottom']) {
+    await js(`setDockSide('${side}'); setDockHidden(true); 0`);
+    await sleep(350);
+    if (shots && side === 'bottom') fs.writeFileSync(path.join(shots, 'tool-bar-hidden-bottom.png'), (await wc.capturePage()).toPNG());
+    const off = await js(`(() => { const d = document.getElementById('dock').getBoundingClientRect(), a = document.getElementById('page-area').getBoundingClientRect(); return { left: d.right <= a.left + 2, top: d.bottom <= a.top + 2, bottom: d.top >= a.bottom - 2 }['${side}']; })()`);
+    const edge = side === 'left' ? [area.left + 8, mid.y] : side === 'top' ? [mid.x, area.top + 8] : [mid.x, area.bottom - 8];
+    await move(...edge);
+    const back = await until(`!document.body.classList.contains('dock-hidden')`, 1000);
+    check(`docked ${side}, it hides off that edge and comes back from it`, off && back);
+  }
+  await js(`setDockSide('right'); document.getElementById('btn-dock-pin').click(); 0`);
+  await sleep(100);
+  await move(mid.x, mid.y);
+  await move(mid.x + 5, mid.y);
+  await sleep(1300);
+  check('pinned, the bar stays', await js(`!document.body.classList.contains('dock-hidden') && !state.settings.dockAutoHide`));
 });
 
 group('settings and dialogs', async () => {

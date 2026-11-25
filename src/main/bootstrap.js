@@ -31,6 +31,7 @@ const DEFAULTS = {
   sidebar: true,
   paperColor: 'white',
   paperTexture: 'none',
+  dockAutoHide: true,
   eraserMode: 'rub',
   defaultCover: 'kolam',
   defaultPaper: 'plain',
