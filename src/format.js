@@ -36,11 +36,51 @@ function writeFileAtomic(file, data) {
   }
 }
 
+async function writeFileAtomicAsync(file, data) {
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  await fs.promises.writeFile(tmp, data);
+  try {
+    await fs.promises.rename(tmp, file);
+  } catch (err) {
+    await fs.promises.rm(tmp, { force: true });
+    throw err;
+  }
+}
+
+/*
+  A file's stamp: its time, size and a checksum of its bytes. Saving compares the file on disk with the
+  stamp from when it was last read or written, so a copy changed elsewhere (OneDrive syncing an edit made on
+  another computer, another program) is never overwritten without asking. The checksum settles it when
+  only the time changed (a sync tool touching the file without changing it).
+*/
+function fileStamp(file) {
+  try {
+    const st = fs.statSync(file);
+    return { mtimeMs: st.mtimeMs, size: st.size };
+  } catch {
+    return null;
+  }
+}
+const fileCrc = (file) => zlib.crc32(fs.readFileSync(file)) >>> 0;
+function changedSince(file, stamp) {
+  if (!stamp) return false;
+  const now = fileStamp(file);
+  if (!now) return false; // gone: saving simply writes it again
+  if (now.mtimeMs === stamp.mtimeMs && now.size === stamp.size) return false;
+  if (now.size !== stamp.size || stamp.crc === undefined) return true;
+  try {
+    return fileCrc(file) !== stamp.crc;
+  } catch {
+    return true;
+  }
+}
+
 // Reads a notebook file into the shape the renderer parses:
 // { text } for old JSON notebooks, or { v3: { notebook, pages: {name: json}, assets: {name: dataUrl} } }.
 function readNotebook(file) {
   const buf = fs.readFileSync(file);
-  if (!isZip(buf)) return { text: buf.toString('utf8') };
+  const crc = zlib.crc32(buf) >>> 0;
+  if (!isZip(buf)) return { text: buf.toString('utf8'), crc };
   let total = 0;
   const files = unzipSync(new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength), {
     filter(f) {
@@ -60,7 +100,7 @@ function readNotebook(file) {
       if (mime) assets[name] = `data:${mime};base64,${Buffer.from(data).toString('base64')}`;
     }
   }
-  return { v3: { notebook: dec.decode(files['notebook.json']), pages, assets } };
+  return { v3: { notebook: dec.decode(files['notebook.json']), pages, assets }, crc };
 }
 
 // Cover, page count and sections of a notebook, reading only its small notebook.json (for the home screen).
@@ -164,33 +204,72 @@ function writeNotebookAsync(file, entries) {
   const run = (queues.get(key) || Promise.resolve()).catch(() => {}).then(async () => {
     const list = [];
     for (const [name, data] of entries) list.push([name, await pack(name, data)]);
-    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-    await fs.promises.writeFile(tmp, zipFrom(list));
-    try {
-      await fs.promises.rename(tmp, file);
-    } catch (err) {
-      await fs.promises.rm(tmp, { force: true });
-      throw err;
-    }
+    const zip = zipFrom(list);
+    await writeFileAtomicAsync(file, zip);
+    const st = await fs.promises.stat(file);
+    return { mtimeMs: st.mtimeMs, size: st.size, crc: zlib.crc32(zip) >>> 0 };
   });
   queues.set(key, run);
   run.finally(() => queues.get(key) === run && queues.delete(key)).catch(() => {});
   return run;
 }
 
+// Resolves once every write to `file` started so far has finished.
+const settled = (file) => (queues.get(path.resolve(file).toLowerCase()) || Promise.resolve()).catch(() => {});
+
 // ---------- Version history ----------
 
 const historyDir = (root, file) =>
   path.join(root, crypto.createHash('sha1').update(path.resolve(file).toLowerCase()).digest('hex').slice(0, 16));
 
-// Copy the file as it is now into its history folder, keeping the newest `limit` copies.
-function snapshot(root, file, limit) {
+/*
+  Copy the file as it is now into its history folder. What is kept: at most `limit` versions and at most
+  `budget` bytes of them, thinned as they age: every version from the last day, then one a day for a month,
+  then one a week. The newest version is always kept.
+*/
+function snapshot(root, file, opts) {
   if (!fs.existsSync(file)) return;
   const dir = historyDir(root, file);
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(file, path.join(dir, `${Date.now()}.ntb`));
-  const old = listHistory(root, file).slice(Math.max(1, limit));
-  for (const v of old) fs.rmSync(path.join(dir, v.id), { force: true });
+  pruneHistory(root, file, opts);
+}
+// Keep a version made from data in hand (not a file on disk): `entries` as for writeNotebook.
+async function snapshotEntries(root, file, entries, opts) {
+  const dir = historyDir(root, file);
+  fs.mkdirSync(dir, { recursive: true });
+  await writeNotebookAsync(path.join(dir, `${Date.now()}.ntb`), entries);
+  pruneHistory(root, file, opts);
+}
+const DAY = 864e5;
+function pruneHistory(root, file, opts) {
+  const { limit = 30, budget = 500e6 } = typeof opts === 'number' ? { limit: opts } : opts || {};
+  const dir = historyDir(root, file);
+  const now = Date.now();
+  const seen = new Set();
+  let used = 0;
+  let kept = 0;
+  for (const v of listHistory(root, file)) {
+    const age = now - v.time;
+    const slot = age < DAY ? `v${v.time}` : age < 30 * DAY ? `d${Math.floor(v.time / DAY)}` : `w${Math.floor(v.time / (7 * DAY))}`;
+    const keep = kept === 0 || (kept < Math.max(1, limit) && !seen.has(slot) && used + v.size <= budget);
+    if (keep) {
+      seen.add(slot);
+      used += v.size;
+      kept++;
+    } else fs.rmSync(path.join(dir, v.id), { force: true });
+  }
+}
+// Bytes used by every notebook's earlier versions.
+function historyUsage(root) {
+  let total = 0;
+  try {
+    for (const d of fs.readdirSync(root)) {
+      const sub = path.join(root, d);
+      for (const n of fs.readdirSync(sub)) total += fs.statSync(path.join(sub, n)).size;
+    }
+  } catch {}
+  return total;
 }
 
 function listHistory(root, file) {
@@ -208,4 +287,7 @@ function historyFile(root, file, id) {
   return path.join(historyDir(root, file), id);
 }
 
-module.exports = { readNotebook, peekNotebook, writeNotebook, writeNotebookAsync, writeFileAtomic, snapshot, listHistory, historyFile, isZip };
+module.exports = {
+  readNotebook, peekNotebook, writeNotebook, writeNotebookAsync, writeFileAtomic, writeFileAtomicAsync,
+  snapshot, snapshotEntries, settled, listHistory, historyFile, historyUsage, isZip, fileStamp, fileCrc, changedSince,
+};

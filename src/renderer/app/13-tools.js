@@ -19,6 +19,35 @@ function setTool(tool) {
 }
 
 /*
+  Each tool's colour and size, the shape you drew last and the tool in hand are remembered, so Jotter
+  opens with the pen as you left it.
+*/
+let toolsTimer = 0;
+function saveToolsSoon() {
+  clearTimeout(toolsTimer);
+  toolsTimer = setTimeout(() => {
+    const tools = { tool: state.tool };
+    for (const k of ['text', 'pen', 'marker', 'eraser', 'shape']) tools[k] = { ...state.tools[k] };
+    state.settings.tools = tools;
+    api.setSettings({ tools });
+  }, 800);
+}
+function restoreTools(saved) {
+  if (!saved || typeof saved !== 'object') return 'text';
+  const hex = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+  for (const k of ['text', 'pen', 'marker', 'eraser', 'shape']) {
+    const from = saved[k];
+    const t = state.tools[k];
+    if (!from || typeof from !== 'object') continue;
+    if ('color' in t && hex(from.color)) t.color = from.color.toLowerCase();
+    const cfg = SIZE_CONFIG[k];
+    if (cfg && Number(from.size) > 0) t.size = cfg.steps[stepIndex(cfg, Number(from.size))];
+    if (k === 'shape' && ['line', 'arrow', 'rect', 'ellipse'].includes(from.kind)) t.kind = from.kind;
+  }
+  return ['text', 'pen', 'marker', 'eraser', 'shape', 'select'].includes(saved.tool) ? saved.tool : 'text';
+}
+
+/*
   Sizes go up in even steps of thickness, not of number: each step is about 12% thicker than the one before,
   so every step looks like the same change whether the line is thin or thick. The steps are the standard
   "preferred numbers" (Renard R20): 1, 1.12, 1.25, 1.4, 1.6, 1.8, 2, 2.24, 2.5 … The − and + buttons, the
@@ -100,6 +129,7 @@ function syncToolUi() {
     el.customColor.value = t.color;
   }
   setSeg('shape-kind', state.tools.shape.kind);
+  saveToolsSoon();
 }
 
 // Set the size to the step nearest `size`.

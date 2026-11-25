@@ -60,7 +60,7 @@ test('PDFs and prints carry the paper texture when asked, and nothing unknown', 
 test('old JSON notebooks are read as text', () => {
   const file = path.join(tmp, 'old.ntb');
   fs.writeFileSync(file, '{"format":"jotter-notebook","pages":[]}');
-  assert.deepEqual(format.readNotebook(file), { text: '{"format":"jotter-notebook","pages":[]}' });
+  assert.equal(format.readNotebook(file).text, '{"format":"jotter-notebook","pages":[]}');
 });
 
 test('unexpected archive entries are ignored', () => {
@@ -83,6 +83,65 @@ test('version history keeps the newest copies only', () => {
   assert.equal(list.length, 2);
   assert.ok(list[0].time > list[1].time);
   assert.throws(() => format.historyFile(root, file, '../x.ntb'));
+});
+
+test('version history thins out old versions and keeps within its space', () => {
+  const file = path.join(tmp, 'thin.ntb');
+  const root = path.join(tmp, 'history-thin');
+  fs.writeFileSync(file, 'x'.repeat(1000));
+  const dir = path.dirname(format.historyFile(root, file, '1.ntb'));
+  fs.mkdirSync(dir, { recursive: true });
+  const day = 864e5;
+  const now = Date.now();
+  // Today every version stays; last week one a day; months ago one a week.
+  const times = [now - 1000, now - 2000, now - 3 * day, now - 3 * day - 3600e3, now - 4 * day, now - 100 * day, now - 100 * day - 3600e3];
+  for (const t of times) fs.writeFileSync(path.join(dir, `${t}.ntb`), 'x'.repeat(1000));
+  format.snapshot(root, file, { limit: 50, budget: 1e9 });
+  const kept = format.listHistory(root, file).map((v) => v.time);
+  assert.equal(kept.length, 6, 'one of each pair from the same old day is dropped');
+  assert.ok(!kept.includes(now - 3 * day - 3600e3) && !kept.includes(now - 100 * day - 3600e3));
+  // A space budget keeps only what fits (always at least the newest).
+  format.snapshot(root, file, { limit: 50, budget: 2500 });
+  assert.equal(format.listHistory(root, file).length, 2);
+  format.snapshot(root, file, { limit: 50, budget: 10 });
+  assert.equal(format.listHistory(root, file).length, 1);
+});
+
+test('a notebook changed by someone else is noticed; one only touched is not', async () => {
+  const file = path.join(tmp, 'stamp.ntb');
+  const stamp = await format.writeNotebookAsync(file, new Map([['notebook.json', Buffer.from('{"version":3}')]]));
+  assert.equal(format.changedSince(file, stamp), false);
+  const t = new Date(Date.now() + 5000);
+  fs.utimesSync(file, t, t); // a sync tool touching the file: same bytes
+  assert.equal(format.changedSince(file, stamp), false);
+  fs.writeFileSync(file, 'different');
+  assert.equal(format.changedSince(file, stamp), true);
+  fs.rmSync(file);
+  assert.equal(format.changedSince(file, stamp), false, 'a missing file is simply written again');
+});
+
+test('the renderer scripts only use what is defined before them, and planted mistakes are caught', () => {
+  const { check } = require('../scripts/check-load-order');
+  assert.deepEqual(check(path.join(__dirname, '..', 'src', 'renderer')), []);
+  const dir = path.join(tmp, 'order');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), '<script src="a.js"></script><script src="b.js"></script>');
+  fs.writeFileSync(path.join(dir, 'a.js'), [
+    'const { x, y } = Lib;',
+    'function early() { return later(); }',
+    'document.addEventListener("click", () => later());', // runs later: fine
+    'for (const c of list) c.append(makeThing(c));', // runs now: makeThing is in b.js
+    'early();', // runs now, and early() uses later()
+    'const n = count + 1;', // count is declared below in this file
+    'let count = 0;',
+  ].join('\n'));
+  fs.writeFileSync(path.join(dir, 'b.js'), 'function makeThing() {}\nfunction later() {}\nconst list = [];');
+  const found = check(dir).join('\n');
+  assert.match(found, /a\.js:4 {2}uses list/);
+  assert.match(found, /a\.js:4 {2}uses makeThing/);
+  assert.match(found, /a\.js:5 {2}uses later \(through early\(\)\)/);
+  assert.match(found, /a\.js:6 {2}uses count/);
+  assert.doesNotMatch(found, /a\.js:3/);
 });
 
 const line = (x0, x1, y = 100, size = 4) => ({ tool: 'pen', color: '#000000', size, points: [x0, y, x1, y] });

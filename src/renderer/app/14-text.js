@@ -114,6 +114,24 @@ el.editor.addEventListener('click', (e) => {
   else hideImageBar();
 });
 
+// Copying out of a page: pictures go to other programs in full (their references mean nothing there).
+for (const type of ['copy', 'cut']) {
+  el.editor.addEventListener(type, (e) => {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return;
+    const box = document.createElement('div');
+    box.append(sel.getRangeAt(0).cloneContents());
+    if (!box.querySelector('img[src^="blob:"]')) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/html', Model.Images.inline(box.innerHTML));
+    e.clipboardData.setData('text/plain', sel.toString());
+    if (type === 'cut') {
+      document.execCommand('delete');
+      onEditorChanged();
+    }
+  });
+}
+
 // Paste as plain text (or as an embedded image) so notes never carry outside markup or remote content.
 el.editor.addEventListener('paste', async (e) => {
   e.preventDefault();

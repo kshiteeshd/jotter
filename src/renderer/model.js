@@ -78,6 +78,54 @@
   ];
 
   const uid = () => crypto.randomUUID();
+
+  /*
+    Pictures. In a page's text a picture is a short reference (a blob: address) to one copy of it held
+    here, not the picture itself: page text stays small, so typing beside a picture, undo history and
+    saving do not copy megabytes each time. Saved files are unchanged: each picture is stored once, as
+    binary, by name. Pictures are kept until another notebook is opened.
+  */
+  const Images = (() => {
+    const byUrl = new Map(); // blob: address -> { name, b64, mime }
+    const byName = new Map(); // assets/<hash>.<ext> -> blob: address
+    const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+    function add(mime, b64, name) {
+      name = name || `assets/${hashName(b64)}.${EXT[mime]}`;
+      const known = byName.get(name);
+      if (known) return known;
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      byUrl.set(url, { name, b64, mime });
+      byName.set(name, url);
+      return url;
+    }
+    const DATA = /^data:(image\/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=]+)$/;
+    return {
+      // A data: address (from a file, the clipboard or an old notebook) becomes a reference.
+      fromDataUrl(dataUrl, name) {
+        const m = DATA.exec(dataUrl);
+        return m ? add(m[1], m[2], name) : null;
+      },
+      has: (url) => byUrl.has(url),
+      get: (url) => byUrl.get(url),
+      dataUrl(url) {
+        const i = byUrl.get(url);
+        return i ? `data:${i.mime};base64,${i.b64}` : null;
+      },
+      // Page text with every reference written out in full (for printing and other programs).
+      inline: (html) => html.replace(/src="(blob:[^"]+)"/g, (m, url) => (byUrl.has(url) ? `src="${Images.dataUrl(url)}"` : m)),
+      clear() {
+        for (const url of byUrl.keys()) URL.revokeObjectURL(url);
+        byUrl.clear();
+        byName.clear();
+      },
+      get size() {
+        return byUrl.size;
+      },
+    };
+  })();
   const isId = (v) => typeof v === 'string' && /^[\w-]{8,64}$/.test(v);
 
   function newPage(title, like = {}) {
@@ -124,7 +172,13 @@
       for (const attr of [...node.attributes]) {
         const name = attr.name.toLowerCase();
         const v = attr.value;
-        if (name === 'src' && node.tagName === 'IMG' && /^data:image\/(png|jpeg|gif|webp);base64,/i.test(v)) continue;
+        if (name === 'src' && node.tagName === 'IMG') {
+          const ref = v.startsWith('blob:') ? (Images.has(v) ? v : null) : Images.fromDataUrl(v);
+          if (ref) {
+            node.setAttribute('src', ref);
+            continue;
+          }
+        }
         if (name === 'href' && node.tagName === 'A' && /^(https?:\/\/|mailto:)/i.test(v.trim())) continue;
         if (name === 'class') {
           const keep = v.split(/\s+/).filter((c) => ALLOWED_CLASSES.has(c));
@@ -146,7 +200,10 @@
     const mode = p.mode === 'infinite' ? 'infinite' : 'paged';
     let html = typeof p.html === 'string' ? p.html : '';
     if (assets) {
-      html = html.replace(/src="asset:(assets\/[\w-]+\.\w+)"/g, (_m, name) => (assets[name] ? `src="${assets[name]}"` : ''));
+      html = html.replace(/src="asset:(assets\/[\w-]+\.\w+)"/g, (_m, name) => {
+        const ref = assets[name] && Images.fromDataUrl(assets[name], name);
+        return ref ? `src="${ref}"` : '';
+      });
     }
     const strokes = (Array.isArray(p.strokes) ? p.strokes : []).filter((s) => Ink.valid(s, true)).map(Ink.clean);
     return {
@@ -231,11 +288,18 @@
     let form = htmlForms.get(source);
     if (!form) {
       const assets = [];
-      const html = source.replace(/src="data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"/g, (_m, ext, b64) => {
-        const name = assetName(b64, ext);
-        assets.push({ name, data: b64 });
-        return `src="asset:${name}"`;
-      });
+      const html = source
+        .replace(/src="(blob:[^"]+)"/g, (m, url) => {
+          const i = Images.get(url);
+          if (!i) return m;
+          assets.push({ name: i.name, data: i.b64 });
+          return `src="asset:${i.name}"`;
+        })
+        .replace(/src="data:image\/(png|jpeg|gif|webp);base64,([A-Za-z0-9+/=]+)"/g, (_m, ext, b64) => {
+          const name = assetName(b64, ext);
+          assets.push({ name, data: b64 });
+          return `src="asset:${name}"`;
+        });
       if (htmlForms.size > 60) htmlForms.clear();
       form = { html, assets };
       htmlForms.set(source, form);
@@ -359,6 +423,7 @@
   }
 
   root.Model = {
+    Images,
     PAPER_STYLES,
     PAPER_COLORS,
     paperHex,

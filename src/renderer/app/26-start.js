@@ -6,8 +6,9 @@
   state.fullscreen = boot.fullscreen;
   state.version = boot.version;
   syncSettingsUi();
-  setTool('text');
-  setZoom(1);
+  setTool(restoreTools(boot.settings.tools));
+  state.userZoomed = boot.settings.zoom > 0;
+  setZoom(state.userZoomed ? boot.settings.zoom : 1);
   updateWco();
   applyCoverTheme();
 

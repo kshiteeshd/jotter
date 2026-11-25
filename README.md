@@ -27,13 +27,16 @@ Requires Node.js 20 or later on Windows.
 
 ```bash
 npm install
-npm start          # run the app
-npm test           # everything: unit tests, then the app tests (about 15 seconds)
-npm run test:unit  # file format and ink geometry only
+npm start          # run the app (with a profile of its own, apart from an installed Jotter)
+npm test           # everything: unit tests, then the app tests (about 30 seconds)
+npm run test:unit  # file format, ink geometry and the script load order
+npm run check      # the renderer scripts only use what is defined before them
 npm run test:app   # the real app, driven by mouse and keyboard; add group names to run some
 npm run audit:contrast  # colour contrast of every screen, theme and cover
 npm run dist       # build the installer into dist/
 ```
+
+To sign the installer, see [docs/SIGNING.md](docs/SIGNING.md).
 
 ## Project layout
 

@@ -1,6 +1,6 @@
 {
   "name": "jotter",
-  "version": "3.8.0",
+  "version": "4.0.0",
   "description": "A simple notebook app for typing and handwriting",
   "main": "src/main.js",
   "author": "Jotter",
@@ -13,7 +13,8 @@
     "test": "node --test test/unit.test.js && electron test/app.e2e.js",
     "test:unit": "node --test test/unit.test.js",
     "test:app": "electron test/app.e2e.js",
-    "audit:contrast": "electron scripts/contrast.js contrast-out"
+    "audit:contrast": "electron scripts/contrast.js contrast-out",
+    "check": "node scripts/check-load-order.js"
   },
   "build": {
     "appId": "com.jotter.notebook",

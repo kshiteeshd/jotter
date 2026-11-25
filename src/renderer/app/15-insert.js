@@ -86,8 +86,10 @@ async function imageDataUrl(file) {
 async function insertImageFile(file) {
   const data = await imageDataUrl(file);
   if (!data) return;
+  const ref = Model.Images.fromDataUrl(data);
+  if (!ref) return flash('That image could not be read.');
   restoreSelection();
-  document.execCommand('insertImage', false, data);
+  document.execCommand('insertImage', false, ref);
   onEditorChanged();
 }
 

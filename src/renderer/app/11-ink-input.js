@@ -39,10 +39,25 @@ function piecePath(pts, i) {
   return [`M${sx} ${sy}`, `Q${cx} ${cy} ${ex} ${ey}`];
 }
 
+/*
+  The width of piece i while it is drawn: from the pen's pressure, or, for a pen line without pressure,
+  the gentle taper of its start, the same as the finished line has, so nothing changes under the nib
+  when it lifts (only the very end then thins out). Null: the line's own width.
+*/
+function liveWidth(c, i) {
+  if (c.w) return Ink.pressureWidth(c.size, c.w[i]);
+  if (c.tool !== 'pen' || c.straight) return null;
+  const pts = c.points;
+  const al = c.along || (c.along = [0]);
+  for (let j = al.length; j <= i; j++) al[j] = al[j - 1] + Math.hypot(pts[j * 2] - pts[j * 2 - 2], pts[j * 2 + 1] - pts[j * 2 - 1]);
+  const reach = 6 + c.size * 4;
+  if (al[i] >= reach) return null;
+  return r1(Ink.pressureWidth(c.size, 0.15 + 0.35 * Math.sqrt(al[i] / reach)));
+}
+
 function liveStroke(c) {
   const pts = c.points;
   const n = pts.length / 2;
-  const widths = c.w;
   if (!liveInk || n < liveInk.n) {
     strokeGroup.textContent = '';
     const attrs = { fill: 'none', stroke: c.color, 'stroke-width': c.size, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: c.tool === 'marker' ? Ink.MARKER_ALPHA : 1 };
@@ -55,10 +70,12 @@ function liveStroke(c) {
   const settled = n - 1 - Ink.FILTER_REACH - 1; // pieces before this no longer change
   for (; L.done < settled; L.done++) {
     const [m, q] = piecePath(pts, L.done);
-    if (widths || !L.chunk || L.count >= 48) {
+    const w = liveWidth(c, L.done);
+    if (w !== null || L.varied || !L.chunk || L.count >= 48) {
       if (L.chunk) L.chunk.setAttribute('d', L.d);
       L.chunk = document.createElementNS(SVG_NS, 'path');
-      if (widths) L.chunk.setAttribute('stroke-width', Ink.pressureWidth(c.size, widths[L.done]));
+      L.varied = w !== null;
+      if (w !== null) L.chunk.setAttribute('stroke-width', w);
       strokeGroup.insertBefore(L.chunk, L.tail);
       L.d = m;
       L.count = 0;
@@ -72,10 +89,18 @@ function liveStroke(c) {
   let d = '';
   for (let i = L.done; i < n; i++) {
     const [m, q] = piecePath(pts, i);
-    if (widths) markup += `<path d="${m}${q}" stroke-width="${Ink.pressureWidth(c.size, widths[i])}"/>`;
+    const w = liveWidth(c, i);
+    if (w !== null) markup += `<path d="${m}${q}" stroke-width="${w}"/>`;
     else d += (d ? '' : m) + q;
   }
-  L.tail.innerHTML = widths ? markup : `<path d="${d}"/>`;
+  if (d) markup += `<path d="${d}"/>`;
+  // Where the pen is about to be (the system's prediction), drawn ahead so the line keeps up with the
+  // nib; it is replaced by the real points as they arrive and never kept.
+  if (c.predicted && c.predicted.length && !c.straight) {
+    const w = liveWidth(c, n - 1);
+    markup += `<path d="M${pts[n * 2 - 2]} ${pts[n * 2 - 1]}L${c.predicted.join(' ')}"${w !== null ? ` stroke-width="${w}"` : ''}/>`;
+  }
+  L.tail.innerHTML = markup;
 }
 
 function updateLive() {
@@ -233,6 +258,7 @@ function flushInkMove() {
   if (!batch || !current || batch.pointerId !== current.pointerId) return;
   if (!activeScale) activeScale = sheetScale();
   for (const ev of batch.events) addPoint(ev, activeScale);
+  current.predicted = (current.tool === 'pen' || current.tool === 'marker') && batch.predicted ? batch.predicted.flatMap((ev) => toSheetPoint(ev, activeScale)) : null;
   if (current.tool === 'lasso') drawLasso();
   else updateLive();
 }
@@ -254,6 +280,8 @@ el.inkLayer.addEventListener('pointermove', (e) => {
   const list = usable ? events : [e];
   if (pendingInk && pendingInk.pointerId === e.pointerId) pendingInk.events.push(...list);
   else pendingInk = { pointerId: e.pointerId, events: list.slice() };
+  const ahead = e.getPredictedEvents ? e.getPredictedEvents() : [];
+  pendingInk.predicted = ahead.length ? ahead.slice(0, 2) : null;
   if (!inkFrame) inkFrame = requestAnimationFrame(flushInkMove);
 });
 

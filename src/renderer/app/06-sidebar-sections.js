@@ -154,7 +154,7 @@ $('section-menu').addEventListener('click', (e) => {
     closePopovers();
   } else if (b.dataset.action === 'pdf') {
     closePopovers();
-    run('export-pdf', () => exportPdf({ section: i }));
+    run('export-pdf', () => openExport({ format: 'pdf', section: i }));
   } else if (b.dataset.action === 'rename') renameSection(i);
   else if (b.dataset.action === 'delete') run('delete-section', () => deleteSection(i));
 });

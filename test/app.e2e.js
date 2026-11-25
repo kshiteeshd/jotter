@@ -110,6 +110,27 @@ async function answer(label, input) {
   if (!ok) throw new Error(`no "${label}" button`);
   await until(`!document.getElementById('ask').open && !busy`);
 }
+/*
+  Export through the export dialog: open it (with `cmd`), pick the format and the other choices by their
+  titles, press Export, and wait for the job to finish.
+*/
+async function exportWith(cmd, { format, choose = [] } = {}) {
+  await until('!busy', 5000);
+  await js(`run('${cmd}'); 0`);
+  if (!(await until(`document.getElementById('export-dialog').open`))) throw new Error('no export dialog');
+  await js(`(() => {
+    ${format ? `document.querySelector('#export-format [data-value="${format}"]').click();` : ''}
+    for (const t of ${JSON.stringify(choose)}) {
+      const b = [...document.querySelectorAll('#export-dialog .option')].find((o) => o.querySelector('.option-title').textContent === t && o.offsetParent);
+      if (!b) throw new Error('no export choice ' + t);
+      b.click();
+    }
+    document.getElementById('export-go').click();
+  })()`);
+  await until('!document.getElementById("export-dialog").open');
+  await until('!busy', 8000);
+}
+
 // A fresh notebook for a group of tests.
 async function fresh(name) {
   await js(`(async () => { await createNotebook('kolam', ${JSON.stringify(name)}); setTool('text'); })()`);
@@ -156,7 +177,9 @@ group('typing and formatting', async () => {
   await answer('Add link', 'example.com');
   check('link, made safe', await js(`!!el.editor.querySelector('a[href="https://example.com"]')`));
   await js(`(async () => { const c = document.createElement('canvas'); c.width = 40; c.height = 30; const blob = await new Promise((r) => c.toBlob(r)); await insertImageFile(new File([blob], 'a.png', { type: 'image/png' })); })()`);
-  check('image', await js(`!!el.editor.querySelector('img[src^="data:image/"]')`));
+  check('image', await js(`!!el.editor.querySelector('img[src^="blob:"]')`));
+  check("…held once, by reference, not inside the page text", await js(`(commitEditor(), page().html.includes("blob:") && !page().html.includes("data:image") && Model.Images.size > 0)`));
+  check('…and saved as a picture of its own', await js(`Model.buildSave(state.nb, Model.newSent()).request.assets.length === 1`));
   await js(`insertTextBox(); 0`);
   check('text box', await js(`!!el.editor.querySelector('.tbox .tbox-body')`));
   await js(`el.editor.focus(); document.execCommand('insertHTML', false, '<img src="x" onerror="window.__x = 1"><a href="javascript:alert(1)">bad</a>'); onEditorChanged(); 0`);
@@ -535,14 +558,21 @@ group('dialogs and menus', async () => {
   await js(`addSection(); document.activeElement.blur(); renameItem('section', 1, 'Matrix and Determinants'); setTool('text'); 0`);
   await typeText('Some notes');
   check('every dialog has a close button', await js(`[...document.querySelectorAll('dialog')].every((d) => d.querySelector('.dialog-close'))`));
-  // Long answers are a list of full choices, nothing cut off.
+  // Longer answers are cards, each in full with a note.
   await js(`run('export-pdf'); 0`);
-  await until(`document.getElementById('ask').open`);
-  const choices = await js(`[...document.querySelectorAll('#ask-choices .choice')].map((c) => ({ text: c.querySelector('.choice-title').textContent, note: !!c.querySelector('small'), cut: c.scrollWidth > c.clientWidth + 1 }))`);
-  equal('the export question lists its three choices in full', choices.map((c) => c.text), ['Whole notebook', 'Each section as its own PDF', 'This section only']);
+  await until(`document.getElementById('export-dialog').open`);
+  const choices = await js(`[...document.querySelectorAll('#export-scope .option')].map((c) => ({ text: c.querySelector('.option-title').textContent, note: !!c.querySelector('small'), cut: c.scrollWidth > c.clientWidth + 1 }))`);
+  equal('the export dialog lists the three PDF choices in full', choices.map((c) => c.text), ['Whole notebook', 'Each section as its own PDF', 'This section only']);
   check('…each with a note, none cut off', choices.every((c) => c.note && !c.cut));
+  check('dialogs have a body and a footer with the answers', await js(`(() => { const d = document.getElementById('export-dialog'); const body = d.querySelector('.dialog-body').getBoundingClientRect(), foot = d.querySelector('.dialog-buttons').getBoundingClientRect(); return foot.top >= body.bottom - 1 && d.querySelector('.dialog-buttons .primary').getBoundingClientRect().right > d.querySelector('#export-cancel').getBoundingClientRect().right; })()`));
+  await js(`document.querySelector('#export-dialog .dialog-close').click(); 0`);
+  check('the close button cancels', await until(`!document.getElementById('export-dialog').open && !busy`));
+  // A question with long answers lists them as choices.
+  await js(`setTimeout(() => ask({ message: 'Q', buttons: ['A much longer first answer', 'Another long answer here', 'Cancel'], notes: ['one', 'two'], cancelId: 2 }), 0); 0`);
+  await until(`document.getElementById('ask').open`);
+  equal('a question with long answers lists them as choices', await js(`document.querySelectorAll('#ask-choices .choice').length`), 2);
   await js(`document.querySelector('#ask .dialog-close').click(); 0`);
-  check('the close button cancels the question', await until(`!document.getElementById('ask').open && !busy`));
+  await until(`!document.getElementById('ask').open`);
   // Short answers: Cancel on the left, the main answer on the right.
   await js(`run('delete-section', () => deleteSection(1)); 0`);
   await until(`document.getElementById('ask').open`);
@@ -564,8 +594,11 @@ group('dialogs and menus', async () => {
   await until(`!document.getElementById('section-menu').hidden`);
   fs.rmSync(outFiles.pdf, { force: true });
   await js(`document.querySelector('#section-menu [data-action="pdf"]').click(); 0`);
+  await until(`document.getElementById('export-dialog').open`);
+  check('Download as PDF opens the export dialog set to that section', await js(`document.querySelector('#export-scope [aria-checked="true"] small').textContent.includes('Matrix and Determinants')`));
+  await js(`document.getElementById('export-go').click(); 0`);
   for (let i = 0; i < 100 && !fs.existsSync(outFiles.pdf); i++) await sleep(50);
-  check('Download as PDF saves that section', fs.existsSync(outFiles.pdf));
+  check('…and saves that section', fs.existsSync(outFiles.pdf));
   await until('!busy', 5000);
   await click('#section-list li:nth-child(2) .more');
   await until(`!document.getElementById('section-menu').hidden`);
@@ -644,24 +677,33 @@ group('export', async () => {
   await typeText('Export me');
   await js(`addPage(); document.querySelector('#page-mode [data-value="infinite"]').click(); 0`);
   const pdfPages = () => (fs.readFileSync(outFiles.pdf, 'latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
-  const exportPdf = async (choice) => {
+  const exportPdf = async (choose) => {
     fs.rmSync(outFiles.pdf, { force: true });
-    await js(`run('export-pdf'); 0`);
-    await answer(choice);
+    await exportWith('export-pdf', { choose });
     for (let i = 0; i < 100 && !fs.existsSync(outFiles.pdf); i++) await sleep(50);
     await sleep(100);
   };
-  await exportPdf('A4 pages only');
+  // One dialog: only the choices that apply are shown.
+  await js(`run('export'); 0`);
+  await until(`document.getElementById('export-dialog').open`);
+  check('one export dialog with format, and the infinite-page choice (the pages are mixed)', await js(`!!document.querySelector('#export-format [data-value="pdf"]') && !document.getElementById('export-infinite-row').hidden`));
+  check('…no section choice in a one-section notebook, no background choice on white paper', await js(`document.getElementById('export-scope-row').hidden && document.getElementById('export-look-row').hidden`));
+  await js(`document.querySelector('#export-dialog .dialog-close').click(); 0`);
+  check('the close button cancels', await until(`!document.getElementById('export-dialog').open && !busy`));
+  await exportPdf(['A4 pages only']);
   equal('PDF of A4 pages only', pdfPages(), 1);
-  await exportPdf('Include infinite pages');
+  await exportPdf(['Include infinite pages']);
   equal('PDF with the infinite page too', pdfPages(), 2);
+  await js(`run('export'); 0`);
+  await until(`document.getElementById('export-dialog').open`);
+  check('the last choices are remembered', await js(`document.querySelector('#export-infinite [aria-checked="true"] .option-title').textContent === 'Include infinite pages'`));
+  await js(`document.getElementById('export-cancel').click(); 0`);
+  await until('!busy');
   // Each section as its own PDF, and this section only.
   await js(`addSection(); document.activeElement.blur(); renameItem('section', 1, 'Second'); setTool('text'); 0`);
   await typeText('In the second section');
   const sectionPdfs = async () => {
-    await js(`run('export-pdf'); 0`);
-    await answer('Each section as its own PDF');
-    await answer('A4 pages only');
+    await exportWith('export-pdf', { choose: ['Each section as its own PDF', 'A4 pages only'] });
     for (let i = 0; i < 100 && !(fs.existsSync(pdfFolder) && fs.readdirSync(pdfFolder).length >= 2); i++) await sleep(50);
     await until('!busy', 5000);
     return fs.existsSync(pdfFolder) ? fs.readdirSync(pdfFolder).sort() : [];
@@ -670,18 +712,21 @@ group('export', async () => {
   const sheetsIn = (f) => (fs.readFileSync(path.join(pdfFolder, f), 'latin1').match(/\/Type\s*\/Page\b(?!s)/g) || []).length;
   equal('…with the pages of that section only', [sheetsIn('Export - Notes.pdf'), sheetsIn('Export - Second.pdf')], [1, 1]);
   equal('exporting again replaces them instead of piling up copies', await sectionPdfs(), ['Export - Notes.pdf', 'Export - Second.pdf']);
-  fs.rmSync(outFiles.pdf, { force: true });
-  await js(`run('export-pdf'); 0`);
-  await answer('This section only');
-  for (let i = 0; i < 100 && !fs.existsSync(outFiles.pdf); i++) await sleep(50);
-  await sleep(100);
+  await exportPdf(['This section only']);
   equal('this section only', pdfPages(), 1);
-  await js(`run('export-png'); 0`);
+  fs.rmSync(outFiles.png, { force: true });
+  await exportWith('export', { format: 'png' });
   for (let i = 0; i < 100 && !fs.existsSync(outFiles.png); i++) await sleep(50);
   check('page image', fs.existsSync(outFiles.png));
-  await js(`run('export-md'); 0`);
+  await exportWith('export', { format: 'md' });
   for (let i = 0; i < 100 && !fs.existsSync(outFiles.md); i++) await sleep(50);
   check('Markdown', fs.existsSync(outFiles.md) && fs.readFileSync(outFiles.md, 'utf8').includes('Export me'));
+  // Coloured paper: the background choice appears.
+  await js(`state.nb.paperColor = 'cream'; applyPaper(); run('export-pdf'); 0`);
+  await until(`document.getElementById('export-dialog').open`);
+  check('a coloured paper offers a white or paper background', await js(`!document.getElementById('export-look-row').hidden`));
+  await js(`document.getElementById('export-cancel').click(); state.nb.paperColor = 'white'; applyPaper(); 0`);
+  await until('!busy');
 });
 
 group('paper colour and texture', async () => {
@@ -700,8 +745,12 @@ group('paper colour and texture', async () => {
   const file = path.join(library, 'Paper.ntb');
   await js(`(async () => { await leaveNotebook(); setNotebook(Model.newNotebook({ cover: 'kolam' }), null); await loadFile(await api.readNotebook(${JSON.stringify(file)})); })()`);
   equal('both are saved with the notebook', await js('[state.nb.paperColor, state.nb.paperTexture]'), ['#dcefe4', 'linen']);
-  check('new notebooks start with the same paper', await js(`state.settings.paperColor === '#dcefe4' && state.settings.paperTexture === 'linen'`));
-  await js(`applySettings({ paperColor: 'white', paperTexture: 'none' }); 0`);
+  check('changing this notebook\'s paper leaves new notebooks as they were', await js(`state.settings.paperColor === 'white' && state.settings.paperTexture === 'none'`));
+  await js(`openSettings('notebook'); document.getElementById('btn-paper-default').click(); 0`);
+  check('“Use this paper” makes it the paper for new notebooks', await until(`state.settings.paperColor === '#dcefe4' && state.settings.paperTexture === 'linen'`));
+  await js(`openSettings('new'); document.querySelector('#new-paper-colors [data-value="cream"]').click(); 0`);
+  check('new notebooks have a paper choice of their own', await until(`state.settings.paperColor === 'cream' && state.nb.paperColor === '#dcefe4'`));
+  await js(`document.getElementById('settings-dialog').close(); applySettings({ paperColor: 'white', paperTexture: 'none' }); 0`);
 });
 
 group('search', async () => {
@@ -856,6 +905,131 @@ group('tool bar hides when not in use', async () => {
   check('pinned, the bar stays', await js(`!document.body.classList.contains('dock-hidden') && !state.settings.dockAutoHide`));
 });
 
+group('keeping your work safe', async () => {
+  const format = require('../src/format');
+  const fileOf = (name) => path.join(library, `${name}.ntb`);
+  const textIn = (file) => {
+    const r = format.readNotebook(file);
+    return Object.values(r.v3.pages).map((j) => JSON.parse(j).html).join(' ');
+  };
+  const saved = async () => {
+    await js('saveNotebook(false, true)');
+    await until('!state.saving && !state.dirty');
+  };
+  // Another notebook's file stands in for a version changed on another computer.
+  await fresh('Other');
+  await typeText('other text');
+  await saved();
+  await fresh('Other2');
+  await typeText('second other text');
+  await saved();
+  await fresh('Safe');
+  await typeText('mine');
+  await saved();
+  const outside = () => fs.copyFileSync(fileOf('Other'), state.path);
+  const state = { path: fileOf('Safe') };
+
+  // Changed elsewhere, then you save: you are asked, nothing is overwritten.
+  outside();
+  await typeText(' more');
+  await js('saveNotebook(false, true); 0');
+  check('a notebook changed elsewhere is not saved over: you are asked', await until(`document.getElementById('ask').open && document.getElementById('ask-title').textContent.includes('changed outside Jotter')`));
+  check('…and the status bar says so', await js(`el.saveState.dataset.state === 'conflict'`));
+  await answer('Keep both');
+  await until('!state.saving && !state.dirty');
+  check('keep both: yours is saved next to it', await js(`state.path.endsWith('Safe (my changes).ntb')`) && textIn(fileOf('Safe (my changes)')).includes('mine more'));
+  check('…and the changed one is left as it was', fs.readFileSync(fileOf('Safe')).equals(fs.readFileSync(fileOf('Other'))));
+  state.path = fileOf('Safe (my changes)');
+
+  outside();
+  await typeText(' again');
+  await js('saveNotebook(false, true); 0');
+  await until(`document.getElementById('ask').open`);
+  await answer('Replace it with my version');
+  await until('!state.saving && !state.dirty');
+  check('replace: the file has your version', textIn(state.path).includes('mine more again'));
+  check('…and the replaced one is in Version history', await js(`api.listHistory().then((v) => v.length > 0)`));
+
+  outside();
+  await typeText(' lost?');
+  await js('saveNotebook(false, true); 0');
+  await until(`document.getElementById('ask').open`);
+  const versions = await js(`api.listHistory().then((v) => v.length)`);
+  await answer('Open the changed version');
+  check('open the changed version: it is shown', await until(`(commitEditor(), Model.pageText(page()).includes('other text'))`));
+  check('…and yours is kept in Version history', (await js(`api.listHistory().then((v) => v.length)`)) > versions);
+
+  fs.copyFileSync(fileOf('Other2'), state.path); // the file is Other's now: change it to something else
+  await typeText(' later');
+  await js('saveNotebook(false, true); 0');
+  await until(`document.getElementById('ask').open`);
+  await answer('Decide later');
+  check('decide later: autosave waits, the status bar keeps saying so', await js(`state.conflict && el.saveState.dataset.state === 'conflict'`));
+  await js(`run('save'); 0`);
+  check('…and Save asks again', await until(`document.getElementById('ask').open`));
+  await answer('Replace it with my version');
+  await until('!state.saving && !state.dirty && !busy');
+
+  // Changed elsewhere while you have nothing unsaved: coming back to Jotter shows the new version.
+  outside();
+  await js(`window.dispatchEvent(new Event('focus')); 0`);
+  check('a notebook changed elsewhere (nothing unsaved here) is shown again when you come back', await until(`(commitEditor(), Model.pageText(page()).includes('other text'))`));
+  check('…on the same page', await js(`state.view === 'editor'`));
+
+  // The recovery copy of a saved notebook holds only what changed.
+  await fresh('Draft');
+  await typeText('first page');
+  await js(`addPage(); 0`);
+  await typeText('second page');
+  await saved();
+  await js(`showPage(0); 0`);
+  await typeText(' changed');
+  const drafts = path.join(profile, 'drafts');
+  const draftFile = () => (fs.existsSync(drafts) ? fs.readdirSync(drafts).filter((f) => f.endsWith('.ntb')).map((f) => path.join(drafts, f))[0] : null);
+  let draft = null;
+  for (let i = 0; i < 60 && !(draft = draftFile()); i++) await sleep(25);
+  await sleep(150);
+  check('half a second after a change, a recovery copy is written', !!draft);
+  equal('…holding only the page that changed', draft ? Object.keys(format.readNotebook(draft).v3.pages).length : -1, 1);
+
+  // The page crashes before the notebook is saved: it starts again and offers your work back.
+  await js(`clearTimeout(autoTimer); 0`);
+  wc.forcefullyCrashRenderer();
+  await sleep(300);
+  await new Promise((r) => (wc.isLoading() ? wc.once('did-finish-load', r) : r()));
+  await until('typeof run === "function" && state.version', 8000);
+  check('after a crash, the work is offered back', await until(`document.getElementById('ask').open && document.getElementById('ask-title').textContent.includes('Restore')`, 8000));
+  await answer('Restore');
+  const got = await until(`state.nb && pages().length === 2 && (commitEditor(), Model.pageText(pages()[0]).includes('changed')) && Model.pageText(pages()[1]).includes('second page')`);
+  check('…every page, with the last change', got, await js(`state.nb && JSON.stringify([state.path, pages().map((p) => Model.pageText(p))])`));
+  await saved();
+  check('…and it saves to its own file again', textIn(fileOf('Draft')).includes('changed') && textIn(fileOf('Draft')).includes('second page'));
+});
+
+group('remembered between sessions', async () => {
+  await fresh('Remember');
+  await js(`setTool('pen'); setColor('#b3322a'); setSize(4); 0`);
+  check('each tool\'s colour and size are remembered', await until(`state.settings.tools && state.settings.tools.pen && state.settings.tools.pen.color === '#b3322a' && state.settings.tools.pen.size === 4 && state.settings.tools.tool === 'pen'`, 3000));
+  equal('…and come back', await js(`(() => { state.tools.pen.color = '#000000'; state.tools.pen.size = 1; const t = restoreTools(state.settings.tools); return [t, state.tools.pen.color, state.tools.pen.size]; })()`), ['pen', '#b3322a', 4]);
+  await js(`setTool('text'); run('zoom-in'); 0`);
+  check('a zoom of your own is remembered', await until(`state.settings.zoom > 1`, 3000));
+  await js(`run('zoom-reset'); 0`);
+  check('…until the page is fitted again', await until(`state.settings.zoom === 0`, 3000));
+  win.setSize(1410, 905);
+  await sleep(1500);
+  const kept = JSON.parse(fs.readFileSync(path.join(profile, 'settings.json'), 'utf8')).window;
+  check('the window\'s size and place are remembered', kept && Math.abs(kept.width - 1410) <= 4 && Math.abs(kept.height - 905) <= 4 && kept.x === -20000, JSON.stringify(kept));
+  win.setSize(1400, 900);
+  // A full page says so, and its button starts a new page.
+  await js(`page().sheets = MAX_PAGED; layoutSheets(); 0`);
+  check('a full page says so under its last sheet', await js(`document.querySelector('#extend span').textContent.includes('full') && document.querySelector('#extend small').textContent === MAX_PAGED + ' of ' + MAX_PAGED + ' sheets'`));
+  const before = await js('pages().length');
+  await js(`run('extend-page'); 0`);
+  equal('…and its button continues on a new page', await js('pages().length'), before + 1);
+  // The pen line tapers at its start while you draw, as the finished line does.
+  equal('a pen line is drawn tapered from its start', await js(`(() => { const pts = []; for (let i = 0; i < 60; i++) pts.push(i, 0); const c = { tool: 'pen', size: 3, points: pts }; return [liveWidth(c, 0) < 3, liveWidth(c, 4) > liveWidth(c, 0), liveWidth(c, 50)]; })()`), [true, true, null]);
+});
+
 group('settings and dialogs', async () => {
   await fresh('Settings');
   await js(`openSettings(); 0`);
@@ -873,9 +1047,22 @@ group('settings and dialogs', async () => {
   check('drop-down lists have solid colours', lists);
   for (const cmd of ['about', 'shortcuts']) {
     await js(`run('${cmd}'); 0`);
-    check(`${cmd} dialog opens`, await until(`!!document.querySelector('dialog[open]')`));
+    check(`${cmd} opens its page of the settings`, await until(`document.getElementById('settings-dialog').open && document.getElementById('settings-dialog').dataset.pane === '${cmd}' && !document.querySelector('.pane[data-pane="${cmd}"]').hidden`));
     await js(`document.querySelector('dialog[open]').close(); 0`);
   }
+  await js(`openSettings(); 0`);
+  equal('settings open on this notebook, with every category listed', await js(`[document.getElementById('settings-dialog').dataset.pane, document.querySelectorAll('.settings-nav [data-pane]').length]`), ['notebook', 7]);
+  check('one category shows at a time', await js(`document.querySelectorAll('.settings-panes .pane:not([hidden])').length === 1`));
+  await js(`document.querySelector('.settings-nav [data-pane="general"]').click(); document.getElementById('set-spellcheck').click(); 0`);
+  check('spelling checks can be turned off', await until(`state.settings.spellcheck === false && el.editor.spellcheck === false`));
+  await js(`document.getElementById('set-spellcheck').click(); document.getElementById('settings-dialog').close(); 0`);
+  await until(`state.settings.spellcheck === true`);
+  await js(`showHome(); 0`);
+  await until(`state.view === 'home'`);
+  await js(`openSettings(); 0`);
+  check('from Home, the settings have no notebook page', await js(`document.getElementById('nav-notebook').hidden && document.getElementById('settings-dialog').dataset.pane === 'general'`));
+  await js(`document.getElementById('settings-dialog').close(); run('back'); 0`);
+  await until(`state.view === 'editor'`);
   await js(`run('toggle-fullscreen'); 0`);
   check('full screen', await until('state.fullscreen', 4000));
   await js(`run('toggle-fullscreen'); 0`);

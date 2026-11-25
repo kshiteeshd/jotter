@@ -35,72 +35,148 @@ function exportPayload(list) {
       );
     }
     el.measure.textContent = '';
-    return { sheets, paper: p.paper, html: Model.sanitizeHtml(p.html), ink, scale, offsetX };
+    return { sheets, paper: p.paper, html: Model.Images.inline(Model.sanitizeHtml(p.html)), ink, scale, offsetX };
   });
 }
 
 /*
-  Which pages go into a PDF or a print-out. When the pages mix A4 pages and infinite pages, you choose
-  whether the infinite ones come along (trimmed to their content and cut into A4 sheets) or only the
-  proper A4 pages are exported. Returns null when cancelled.
+  Export: one dialog with every choice in view, instead of a question after a question. The format (PDF,
+  page image, Markdown, print), what to include, whether infinite pages come along and the background are
+  all there at once; only the choices that apply are shown, and each is remembered for next time.
 */
-async function pagesToExport(all = Model.allPages(state.nb)) {
-  const infinite = all.filter((p) => p.mode === 'infinite').length;
-  const paged = all.length - infinite;
-  if (!infinite || !paged) return all;
-  const r = await ask({
-    message: `Include the ${plural(infinite, 'infinite page')}?`,
-    detail: `There ${paged === 1 ? 'is' : 'are'} ${plural(paged, 'A4 page')} and ${plural(infinite, 'infinite page')}. Infinite pages are trimmed to what is on them and cut into A4 sheets.`,
-    buttons: ['A4 pages only', 'Include infinite pages', 'Cancel'],
-    notes: ['Leave the infinite pages out', 'Trimmed to what is on them and cut into A4 sheets'],
-    cancelId: 2,
-  });
-  if (r === 0) return all.filter((p) => p.mode !== 'infinite');
-  if (r === 1) return all;
-  return null;
-}
-
-// The look of exported pages: plain white, or the notebook's own paper colour and texture.
-async function exportLook() {
-  const nb = state.nb;
-  const texture = nb.paperTexture || 'none';
-  if (nb.paperColor === 'white' && texture === 'none') return { background: Model.PAPER_COLORS.white, texture: 'none' };
-  const r = await ask({
-    message: 'Which background should the PDF have?',
-    detail: 'White prints cleanly. The paper keeps the PDF looking like the notebook on screen. Lines are included either way.',
-    buttons: ['White', texture === 'none' ? 'Paper colour' : 'Paper colour and texture', 'Cancel'],
-    notes: ['Prints cleanly', 'Looks like the notebook on screen'],
-    cancelId: 2,
-  });
-  if (r === 0) return { background: Model.PAPER_COLORS.white, texture: 'none' };
-  if (r === 1) return { background: Model.paperHex(nb.paperColor), texture };
-  return null;
-}
-
 const fileName = (name) => name.replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim();
 
-// Export as PDF: the whole notebook in one file, each section in a file of its own, or one section
-// (`section`: a section's index, from its menu).
-async function exportPdf({ section: only } = {}) {
-  commitEditor();
-  const nb = state.nb;
-  let scope = only === undefined ? 'all' : 'this';
-  const sec = nb.sections[only === undefined ? state.secIdx : only];
-  if (only === undefined && nb.sections.length > 1) {
-    const r = await ask({
-      message: 'What should the PDF include?',
-      detail: `This notebook has ${plural(nb.sections.length, 'section')}.`,
-      buttons: ['Whole notebook', 'Each section as its own PDF', 'This section only', 'Cancel'],
-      notes: ['One PDF with every section', 'One PDF per section, saved together in a folder you choose', `Only “${sec.title}”`],
-      cancelId: 3,
-    });
-    if (r !== 0 && r !== 1 && r !== 2) return;
-    scope = ['all', 'each', 'this'][r];
+const exportUi = { format: 'pdf', scope: 'all', infinite: 'paged', look: 'white', section: null, resolve: null };
+
+// A list of radio cards: [{ value, title, note }].
+function renderOptions(id, items, value, onPick) {
+  const box = $(id);
+  box.textContent = '';
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'option';
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(it.value === value));
+    b.dataset.value = it.value;
+    const t = document.createElement('span');
+    t.className = 'option-title';
+    t.textContent = it.title;
+    b.append(t);
+    if (it.note) {
+      const n = document.createElement('small');
+      n.textContent = it.note;
+      b.append(n);
+    }
+    b.addEventListener('click', () => onPick(it.value));
+    box.append(b);
   }
-  const list = await pagesToExport(scope === 'this' ? sec.pages.slice() : Model.allPages(nb));
-  if (!list) return;
-  const look = await exportLook();
-  if (!look) return;
+}
+
+// The pages a choice covers.
+function exportPages(scope = exportUi.scope) {
+  const nb = state.nb;
+  if (exportUi.format === 'png') return [page()];
+  if (scope === 'section') return nb.sections[exportUi.section ?? state.secIdx].pages.slice();
+  return Model.allPages(nb);
+}
+
+function syncExportDialog() {
+  const nb = state.nb;
+  const f = exportUi.format;
+  setSeg('export-format', f);
+  const sec = nb.sections[exportUi.section ?? state.secIdx];
+  // What to include: PDFs of the whole notebook, of each section, or of one section.
+  const scopes =
+    f === 'pdf'
+      ? [
+          { value: 'all', title: 'Whole notebook', note: 'One PDF with every section' },
+          ...(nb.sections.length > 1 ? [{ value: 'each', title: 'Each section as its own PDF', note: 'Saved together in a folder you choose' }] : []),
+          ...(nb.sections.length > 1 || exportUi.section !== null ? [{ value: 'section', title: 'This section only', note: `Only “${sec.title}”` }] : []),
+        ]
+      : [];
+  if (!scopes.some((s) => s.value === exportUi.scope)) exportUi.scope = scopes[0] ? scopes[0].value : 'all';
+  $('export-scope-row').hidden = scopes.length < 2;
+  renderOptions('export-scope', scopes, exportUi.scope, (v) => ((exportUi.scope = v), syncExportDialog()));
+  // Infinite pages, when the pages mix A4 and infinite ones.
+  const list = exportPages();
+  const infinite = list.filter((p) => p.mode === 'infinite').length;
+  const mixed = (f === 'pdf' || f === 'print') && infinite > 0 && infinite < list.length;
+  $('export-infinite-row').hidden = !mixed;
+  renderOptions(
+    'export-infinite',
+    [
+      { value: 'paged', title: 'A4 pages only', note: `Leave out ${plural(infinite, 'infinite page')}` },
+      { value: 'all', title: 'Include infinite pages', note: 'Trimmed to what is on them and cut into A4 sheets' },
+    ],
+    exportUi.infinite,
+    (v) => ((exportUi.infinite = v), syncExportDialog())
+  );
+  // Background, for a coloured or textured paper.
+  const texture = nb.paperTexture || 'none';
+  const plain = nb.paperColor === 'white' && texture === 'none';
+  $('export-look-row').hidden = f !== 'pdf' || plain;
+  renderOptions(
+    'export-look',
+    [
+      { value: 'white', title: 'White', note: 'Prints cleanly' },
+      { value: 'paper', title: texture === 'none' ? 'Paper colour' : 'Paper colour and texture', note: 'Looks like the notebook on screen' },
+    ],
+    exportUi.look,
+    (v) => ((exportUi.look = v), syncExportDialog())
+  );
+  const what = { pdf: 'A PDF, with ink as sharp vector lines.', png: `An image of “${page().title}”, with the paper's look.`, md: 'The notebook’s text as Markdown. Ink and pictures are left out.', print: 'Print the notebook on A4.' }[f];
+  $('export-sub').textContent = what;
+  $('export-go').textContent = f === 'print' ? 'Print…' : 'Export…';
+}
+
+bindSeg('export-format', (v) => {
+  exportUi.format = v;
+  syncExportDialog();
+});
+$('export-cancel').addEventListener('click', () => $('export-dialog').close());
+$('export-go').addEventListener('click', () => {
+  exportUi.go = true;
+  $('export-dialog').close();
+});
+
+// Open the export dialog. `format` picks the format; `section` (an index) fixes "This section" to it.
+async function openExport({ format, section = null } = {}) {
+  if (!state.nb) return;
+  commitEditor();
+  closePopovers();
+  const prefs = state.settings.exportPrefs || {};
+  Object.assign(exportUi, {
+    format: format || (['pdf', 'png', 'md', 'print'].includes(prefs.format) ? prefs.format : 'pdf'),
+    scope: section !== null ? 'section' : ['all', 'each', 'section'].includes(prefs.scope) ? prefs.scope : 'all',
+    infinite: prefs.infinite === 'all' ? 'all' : 'paged',
+    look: prefs.look === 'paper' ? 'paper' : 'white',
+    section,
+    go: false,
+  });
+  syncExportDialog();
+  const dlg = $('export-dialog');
+  await new Promise((resolve) => {
+    dlg.addEventListener('close', resolve, { once: true });
+    dlg.showModal();
+    $('export-go').focus();
+  });
+  if (!exportUi.go) return;
+  const { format: f, scope, infinite, look } = exportUi;
+  state.settings.exportPrefs = { format: f, scope: section !== null ? prefs.scope || 'all' : scope, infinite, look };
+  api.setSettings({ exportPrefs: state.settings.exportPrefs });
+  if (f === 'png') return exportPng();
+  if (f === 'md') return exportMarkdown();
+  let list = exportPages();
+  if (infinite === 'paged' && list.some((p) => p.mode !== 'infinite')) list = list.filter((p) => p.mode !== 'infinite');
+  if (f === 'print') return printNotebook(list);
+  const nb = state.nb;
+  const background = look === 'paper' ? { background: Model.paperHex(nb.paperColor), texture: nb.paperTexture || 'none' } : { background: Model.PAPER_COLORS.white, texture: 'none' };
+  return exportPdf(scope, list, background);
+}
+
+async function exportPdf(scope, list, look) {
+  const nb = state.nb;
   if (scope === 'each') {
     const kept = new Set(list);
     const files = nb.sections
@@ -114,9 +190,10 @@ async function exportPdf({ section: only } = {}) {
     if (res.error) return showError(res.error);
     return flash(`${plural(res.count, 'PDF')} exported to ${res.folder}`);
   }
-  if (!list.length) return flash('Nothing to export: this section has only infinite pages.');
+  if (!list.length) return flash('Nothing to export: these are all infinite pages. Choose “Include infinite pages”.');
   flash('Exporting PDF…');
-  const name = scope === 'this' ? fileName(`${notebookName()} - ${sec.title}`) : notebookName();
+  const sec = nb.sections[exportUi.section ?? state.secIdx];
+  const name = scope === 'section' ? fileName(`${notebookName()} - ${sec.title}`) : notebookName();
   const res = await api.exportPdf({ pages: exportPayload(list), suggestedName: name, ...look });
   if (!res) return flash('');
   if (res.error) return showError(res.error);
@@ -124,7 +201,6 @@ async function exportPdf({ section: only } = {}) {
 }
 
 async function exportPng() {
-  commitEditor();
   const res = await api.exportPng({
     pages: exportPayload([page()]),
     suggestedName: fileName(`${notebookName()} - ${page().title}`),
@@ -137,7 +213,6 @@ async function exportPng() {
 }
 
 async function exportMarkdown() {
-  commitEditor();
   const parts = [`# ${notebookName()}`];
   for (const s of state.nb.sections) {
     parts.push(`## ${s.title}`);
@@ -153,13 +228,10 @@ async function exportMarkdown() {
   flash(`Markdown exported to ${res.path}`);
 }
 
-async function printNotebook() {
-  commitEditor();
-  const list = await pagesToExport();
-  if (!list) return;
+async function printNotebook(list) {
+  if (!list.length) return flash('Nothing to print: these are all infinite pages. Choose “Include infinite pages”.');
   flash('Preparing to print…');
   const res = await api.print({ pages: exportPayload(list), background: Model.PAPER_COLORS.white });
   flash('');
   if (res && res.error) await showError(res.error);
 }
-

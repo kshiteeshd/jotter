@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('jotter', {
   renameNotebook: invoke('notebook:rename'),
   saveNotebook: invoke('notebook:save'),
   listHistory: invoke('history:list'),
+  historyUsage: invoke('history:usage'),
+  checkFile: invoke('file:check'),
   readHistory: invoke('history:read'),
   exportPdf: invoke('export:pdf'),
   exportPdfs: invoke('export:pdfs'),

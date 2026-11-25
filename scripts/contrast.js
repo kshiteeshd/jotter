@@ -157,9 +157,15 @@ app.whenReady().then(async () => {
     'cover picker': `document.getElementById('settings-dialog').close(); pickCover({ title: 'New notebook', ok: 'Create', askName: true }); 0`,
     'message dialog': `document.getElementById('cover-dialog').close(); ask({ message: 'Delete “Page 1”?', detail: 'The page will be removed.', buttons: ['Delete', 'Cancel'], danger: true }); 0`,
     'link dialog': `document.getElementById('ask').close(); setTimeout(() => ask({ message: 'Add a link', detail: 'Text', input: { label: 'Web address', value: 'example.com' }, buttons: ['Add link', 'Cancel'] }), 50); 0`,
-    about: `document.getElementById('ask').close(); openAbout(); 0`,
-    shortcuts: `document.getElementById('about-dialog').close(); document.getElementById('shortcuts').showModal(); 0`,
-    home: `document.getElementById('shortcuts').close(); showHome(); 0`,
+    export: `document.getElementById('ask').close(); openExport({ format: 'pdf' }); 0`,
+    'settings: general': `document.getElementById('export-dialog').close(); openSettings('general'); 0`,
+    'settings: pen': `showPane('pen'); 0`,
+    'settings: new notebooks': `showPane('new'); 0`,
+    'settings: storage': `showPane('storage'); 0`,
+    shortcuts: `showPane('shortcuts'); 0`,
+    about: `showPane('about'); 0`,
+    history: `document.getElementById('settings-dialog').close(); document.getElementById('history-dialog').showModal(); 0`,
+    home: `document.getElementById('history-dialog').close(); showHome(); 0`,
   };
 
   const all = [];

@@ -1,8 +1,19 @@
 // ---------- Version history ----------
 
+// "Today", "Yesterday", or the date.
+function dayLabel(time) {
+  const d = new Date(time);
+  const today = new Date();
+  const start = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((start(today) - start(d)) / 864e5);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: days < 7 ? 'long' : undefined, day: 'numeric', month: 'long', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+}
+
 async function openHistory() {
   if (!state.path) {
-    await ask({ message: 'Save the notebook first.', detail: 'Earlier versions are kept once the notebook has a file.', buttons: ['OK'] });
+    await ask({ message: 'Save the notebook first', detail: 'Earlier versions are kept once the notebook has a file.', buttons: ['OK'] });
     return;
   }
   if (state.dirty) await saveNotebook(false, true);
@@ -10,30 +21,44 @@ async function openHistory() {
   const list = $('history-list');
   list.textContent = '';
   $('history-sub').textContent = versions.length
-    ? 'A copy is kept every ten minutes while you work. Restoring replaces the notebook with that version; the current one is kept as a version too.'
+    ? 'Restoring opens that version in place of the current one; the current one is kept as a version too.'
     : '';
   if (!versions.length) {
-    const li = document.createElement('li');
-    li.className = 'empty-note';
-    li.textContent = 'No earlier versions yet. They appear as you keep working on this notebook.';
-    list.append(li);
+    const p = document.createElement('p');
+    p.className = 'empty-note';
+    p.textContent = 'No earlier versions yet. A version is kept every ten minutes while you work on this notebook.';
+    list.append(p);
   }
+  let day = '';
   for (const v of versions) {
-    const li = document.createElement('li');
+    const label = dayLabel(v.time);
+    if (label !== day) {
+      day = label;
+      const h = document.createElement('h3');
+      h.className = 'history-day';
+      h.textContent = label;
+      list.append(h);
+    }
+    const row = document.createElement('div');
+    row.className = 'history-row';
+    row.setAttribute('role', 'listitem');
     const when = document.createElement('span');
     when.className = 'when';
     const strong = document.createElement('span');
-    strong.textContent = new Date(v.time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    strong.textContent = new Date(v.time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     const small = document.createElement('small');
-    small.textContent = `${timeAgo(v.time)} · ${(v.size / 1024).toFixed(v.size < 102400 ? 1 : 0)} KB`;
+    small.textContent = `${timeAgo(v.time)} · ${formatBytes(v.size)}`;
     when.append(strong, small);
     const b = document.createElement('button');
     b.className = 'big';
+    b.type = 'button';
     b.textContent = 'Restore';
     b.addEventListener('click', () => restoreVersion(v));
-    li.append(when, b);
-    list.append(li);
+    row.append(when, b);
+    list.append(row);
   }
+  const total = versions.reduce((n, v) => n + v.size, 0);
+  $('history-foot').textContent = versions.length ? `${plural(versions.length, 'version')} · ${formatBytes(total)}` : '';
   $('history-dialog').showModal();
 }
 
@@ -46,4 +71,3 @@ async function restoreVersion(v) {
     flash(`Restored the version from ${new Date(v.time).toLocaleString()}`);
   }
 }
-

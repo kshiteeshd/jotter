@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, shell } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeTheme, shell, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -11,6 +11,23 @@ const NTB_FILTER = [{ name: 'Jotter Notebook', extensions: ['ntb'] }];
 const MAX_RECENTS = 30;
 const SNAPSHOT_EVERY = 10 * 60 * 1000; // keep a version at most every 10 minutes per notebook
 const BAR_HEIGHT = 44;
+
+/*
+  The development copy (`npm start`) keeps a profile of its own: its own settings, recent list, recovery
+  copies and single-instance lock, so it never takes over, or is taken over by, the installed Jotter. Its
+  first start borrows the installed copy's settings once. (Tests and scripts set their own profile.)
+*/
+if (!app.isPackaged && path.resolve(app.getPath('userData')).toLowerCase() === path.join(app.getPath('appData'), app.getName()).toLowerCase()) {
+  const shared = path.join(app.getPath('appData'), 'Jotter');
+  const dev = path.join(app.getPath('appData'), 'Jotter Development');
+  try {
+    if (!fs.existsSync(path.join(dev, 'settings.json')) && fs.existsSync(path.join(shared, 'settings.json'))) {
+      fs.mkdirSync(dev, { recursive: true });
+      fs.copyFileSync(path.join(shared, 'settings.json'), path.join(dev, 'settings.json'));
+    }
+  } catch {}
+  app.setPath('userData', dev);
+}
 
 let initialPath = findNotebookArg(process.argv);
 
@@ -37,19 +54,45 @@ const DEFAULTS = {
   defaultPaper: 'plain',
   defaultMode: 'paged',
   penOnly: false,
+  spellcheck: true,
   historyLimit: 30,
+  historyBudgetMB: 500,
   libraryDir: '', // empty means Documents/Jotter
+  tools: {}, // each tool's colour and size, as you last left them
+  exportPrefs: {}, // the answers you last gave when exporting
+  zoom: 0, // 0: fit the page to the window
 };
-let settings = { ...DEFAULTS, recents: [] };
+const PRIVATE = ['recents', 'window'];
+let settings = { ...DEFAULTS, recents: [], window: null };
 
 function loadSettings() {
   try {
     const data = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
-    settings = { ...DEFAULTS, ...data, recents: Array.isArray(data.recents) ? data.recents : [] };
+    settings = { ...DEFAULTS, ...data, recents: Array.isArray(data.recents) ? data.recents : [], window: data.window || null };
+    for (const key of Object.keys(DEFAULTS)) if (typeof settings[key] !== typeof DEFAULTS[key] || settings[key] === null) settings[key] = DEFAULTS[key];
   } catch {}
 }
 
+/*
+  Settings are written a moment after they change, in the background (your place in a notebook is
+  remembered every few seconds while you scroll), and at once when Jotter quits.
+*/
+let settingsTimer = 0;
+let settingsWriting = Promise.resolve();
 function saveSettings() {
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(() => {
+    settingsTimer = 0;
+    const data = JSON.stringify(settings);
+    settingsWriting = settingsWriting
+      .then(() => format.writeFileAtomicAsync(settingsFile(), data))
+      .catch((err) => console.error('Could not save settings:', err.message));
+  }, 400);
+}
+function flushSettings() {
+  if (!settingsTimer) return;
+  clearTimeout(settingsTimer);
+  settingsTimer = 0;
   try {
     format.writeFileAtomic(settingsFile(), JSON.stringify(settings));
   } catch (err) {
@@ -58,7 +101,8 @@ function saveSettings() {
 }
 
 function publicSettings() {
-  const { recents, ...rest } = settings;
+  const rest = { ...settings };
+  for (const k of PRIVATE) delete rest[k];
   return rest;
 }
 
@@ -179,10 +223,38 @@ function overlayColors(dark = nativeTheme.shouldUseDarkColors) {
   return dark ? { color: '#141416', symbolColor: '#ececef' } : { color: '#f3f3f1', symbolColor: '#19191c' };
 }
 
+// Where a new window opens: where the last one was (if that is still on a screen), or a little below
+// and to the right of the window you are in.
+function windowPlace() {
+  const w = settings.window;
+  const onScreen = (b) =>
+    screen.getAllDisplays().some((d) => {
+      const a = d.workArea;
+      return b.x < a.x + a.width - 120 && b.x + b.width > a.x + 120 && b.y >= a.y - 8 && b.y < a.y + a.height - 80;
+    });
+  const valid = w && [w.x, w.y, w.width, w.height].every(Number.isFinite) && w.width >= 860 && w.height >= 560;
+  const from = BrowserWindow.getFocusedWindow();
+  if (from && !from.isFullScreen()) {
+    const b = from.getNormalBounds();
+    const next = { x: b.x + 32, y: b.y + 32, width: b.width, height: b.height };
+    return onScreen(next) ? next : { width: b.width, height: b.height };
+  }
+  if (valid && onScreen(w)) return { x: w.x, y: w.y, width: w.width, height: w.height, maximized: !!w.maximized };
+  return { width: valid ? w.width : 1320, height: valid ? w.height : 880 };
+}
+
+function rememberPlace(win) {
+  if (win.isDestroyed() || win.isFullScreen() || win.isMinimized()) return;
+  settings.window = { ...win.getNormalBounds(), maximized: win.isMaximized() };
+  saveSettings();
+}
+
 function createWindow(boot = {}) {
+  const place = windowPlace();
   const win = new BrowserWindow({
-    width: 1320,
-    height: 880,
+    ...(place.x !== undefined ? { x: place.x, y: place.y } : {}),
+    width: place.width,
+    height: place.height,
     minWidth: 860,
     minHeight: 560,
     title: APP_NAME,
@@ -199,6 +271,13 @@ function createWindow(boot = {}) {
       spellcheck: true,
     },
   });
+  if (place.maximized) win.maximize();
+  let placeTimer = 0;
+  const keepPlace = () => {
+    clearTimeout(placeTimer);
+    placeTimer = setTimeout(() => rememberPlace(win), 600);
+  };
+  for (const ev of ['resize', 'move', 'maximize', 'unmaximize']) win.on(ev, keepPlace);
   const ctx = {
     win,
     id: win.webContents.id,
@@ -207,6 +286,8 @@ function createWindow(boot = {}) {
     dirty: false,
     closeConfirmed: false,
     cache: new Map(), // file parts from the last save, so unchanged pages need not be sent again
+    saved: new Map(), // the parts as last written to the notebook's own file
+    stamp: null, // the notebook file as last read or written (see format.fileStamp)
     snapshots: new Map(),
     draftId: crypto.randomUUID(),
     boot,
@@ -239,7 +320,18 @@ function createWindow(boot = {}) {
 
   win.on('enter-full-screen', () => send(ctx, 'fullscreen', true));
   win.on('leave-full-screen', () => send(ctx, 'fullscreen', false));
+  // If the page crashes, it starts again from its recovery copy (or the notebook as last saved).
+  win.webContents.on('render-process-gone', (_e, details) => {
+    if (details.reason === 'clean-exit' || win.isDestroyed()) return;
+    format.settled(draftPath(ctx)).then(() => {
+      const draft = fs.existsSync(draftPath(ctx)) ? draftPath(ctx) : null;
+      ctx.boot = draft ? { draft } : { file: ctx.path, resume: !ctx.path };
+      Object.assign(ctx, { cache: new Map(), saved: new Map(), dirty: false });
+      if (!win.isDestroyed()) win.reload();
+    });
+  });
   win.on('close', (e) => {
+    rememberPlace(win);
     if (ctx.dirty && !ctx.closeConfirmed) {
       e.preventDefault();
       send(ctx, 'command', 'request-close');
@@ -342,12 +434,41 @@ function toggleFullscreen(ctx, on) {
 
 // ---------- Reading notebooks ----------
 
-function readForPage(file) {
+function readForPage(file, ctx = null) {
   try {
-    return { path: file, at: placeOf(file), ...format.readNotebook(file) };
+    const stamp = format.fileStamp(file);
+    const data = format.readNotebook(file);
+    if (ctx) ctx.stamp = stamp && { ...stamp, crc: data.crc };
+    delete data.crc;
+    return { path: file, at: placeOf(file), ...data };
   } catch (err) {
     return { error: `Could not read the file.\n${err.message}` };
   }
+}
+
+/*
+  A recovery copy of a notebook that has a file holds only what changed since the file was last saved;
+  restoring it lays those parts over the file. If the file has changed elsewhere since, the next save asks
+  before replacing it.
+*/
+function readDraft(ctx, draft) {
+  const loaded = readForPage(draft);
+  if (loaded.error || !loaded.v3) return loaded;
+  let meta = {};
+  try {
+    meta = JSON.parse(loaded.v3.notebook);
+  } catch {}
+  if (typeof meta.draftOf !== 'string' || !fs.existsSync(meta.draftOf)) return loaded;
+  try {
+    const base = format.readNotebook(meta.draftOf);
+    if (base.v3) {
+      loaded.v3.pages = { ...base.v3.pages, ...loaded.v3.pages };
+      loaded.v3.assets = { ...base.v3.assets, ...loaded.v3.assets };
+    }
+    const now = format.fileStamp(meta.draftOf);
+    ctx.stamp = meta.draftBase && typeof meta.draftBase === 'object' ? meta.draftBase : now && { ...now, crc: base.crc };
+  } catch {}
+  return loaded;
 }
 
 const draftsDir = () => userDir('drafts');
@@ -371,18 +492,18 @@ ipcMain.handle('app:ready', (e) => {
   const { file, draft } = ctx.boot;
   let draftFile = null;
   if (draft) {
-    const loaded = readForPage(draft);
+    const loaded = readDraft(ctx, draft);
     fs.rmSync(draft, { force: true }); // the page saves its own recovery copy from now on
     if (!loaded.error) draftFile = loaded;
   }
   let resume = null;
   if (ctx.boot.resume && !file && !draftFile) {
     const last = [...settings.recents].sort((a, b) => b.lastOpened - a.lastOpened).find((r) => fs.existsSync(r.path) && !openElsewhere(ctx, r.path));
-    if (last) resume = readForPage(last.path);
+    if (last) resume = readForPage(last.path, ctx);
   }
   ctx.boot = {};
   return {
-    file: file ? readForPage(file) : null,
+    file: file ? readForPage(file, ctx) : null,
     resume: resume && !resume.error ? resume : null,
     draft: draftFile,
     settings: publicSettings(),
@@ -419,9 +540,15 @@ ipcMain.on('window:overlay', (e, o) => {
 
 ipcMain.handle('settings:set', (_e, patch) => {
   for (const key of Object.keys(DEFAULTS)) {
-    if (patch && key in patch && typeof patch[key] === typeof DEFAULTS[key]) settings[key] = patch[key];
+    if (patch && key in patch && typeof patch[key] === typeof DEFAULTS[key] && patch[key] !== null) settings[key] = patch[key];
+  }
+  // Objects from the page are kept small and plain.
+  for (const key of ['tools', 'exportPrefs']) {
+    if (Array.isArray(settings[key]) || JSON.stringify(settings[key]).length > 4000) settings[key] = {};
   }
   settings.historyLimit = Math.min(200, Math.max(1, Math.round(settings.historyLimit)));
+  settings.historyBudgetMB = Math.min(20000, Math.max(20, Math.round(settings.historyBudgetMB)));
+  settings.zoom = settings.zoom === 0 ? 0 : Math.min(2, Math.max(0.5, Number(settings.zoom) || 0));
   saveSettings();
   applyTheme();
   for (const ctx of windows.values()) send(ctx, 'settings', publicSettings());
@@ -484,7 +611,19 @@ ipcMain.handle('notebook:trash', async (_e, p) => {
   return { list: listNotebooks() };
 });
 
-ipcMain.handle('draft:clear', (e) => fs.rmSync(draftPath(ctxOf(e)), { force: true }));
+// Wait for a recovery copy still being written, so a stale one is never left behind.
+ipcMain.handle('draft:clear', async (e) => {
+  const file = draftPath(ctxOf(e));
+  await format.settled(file);
+  fs.rmSync(file, { force: true });
+});
+
+// Has the open notebook's file changed outside Jotter since it was read or saved?
+ipcMain.handle('file:check', (e) => {
+  const ctx = ctxOf(e);
+  if (!ctx || !ctx.path || !ctx.stamp) return { changed: false };
+  return { changed: format.changedSince(ctx.path, ctx.stamp) };
+});
 
 ipcMain.handle('dialog:open', async (e) => {
   const ctx = ctxOf(e);
@@ -504,7 +643,7 @@ function openForWindow(ctx, file) {
     other.win.focus();
     return { focused: true };
   }
-  return readForPage(file);
+  return readForPage(file, ctx);
 }
 
 // Only notebooks the user has opened before, or ones in the notebooks folder, can be read by path.
@@ -538,8 +677,20 @@ ipcMain.handle('notebook:rename', (e, oldPath, newName) => {
     saveSettings();
   }
   ctx.path = target;
+  if (ctx.stamp) ctx.stamp = { ...ctx.stamp, ...format.fileStamp(target) };
   return { path: target };
 });
+
+const historyOpts = () => ({ limit: settings.historyLimit, budget: settings.historyBudgetMB * 1e6 });
+
+// "Book 1 (my changes).ntb", "Book 1 (my changes 2).ntb"…: a free name next to the notebook.
+function besideName(file, label) {
+  const dir = path.dirname(file);
+  const base = path.basename(file).replace(/\.ntb$/i, '');
+  let out = path.join(dir, `${base} (${label}).ntb`);
+  for (let n = 2; fs.existsSync(out); n++) out = path.join(dir, `${base} (${label} ${n}).ntb`);
+  return out;
+}
 
 /*
   Save. The page sends notebook.json in full, and for each page and image either its data or only its
@@ -565,10 +716,44 @@ ipcMain.handle('notebook:save', async (e, req) => {
   if (req.draft) {
     try {
       fs.mkdirSync(draftsDir(), { recursive: true });
-      await format.writeNotebookAsync(draftPath(ctx), entries);
+      // For a notebook with a file, only what changed since its last save (see readDraft).
+      let parts = entries;
+      if (ctx.path && ctx.saved.size) {
+        let meta = {};
+        try {
+          meta = JSON.parse(entries.get('notebook.json').toString('utf8'));
+        } catch {}
+        meta.draftBase = ctx.stamp;
+        parts = new Map([['notebook.json', Buffer.from(JSON.stringify(meta), 'utf8')]]);
+        for (const [name, buf] of entries) if (name !== 'notebook.json' && ctx.saved.get(name) !== buf) parts.set(name, buf);
+      }
+      await format.writeNotebookAsync(draftPath(ctx), parts);
       return { path: req.path || null };
     } catch (err) {
       return { error: `Could not write the recovery copy.\n${err.message}` };
+    }
+  }
+
+  // The file changed elsewhere since it was read or saved (see the conflict check below). `req.resolve`
+  // says what to do: keep your version in the file's version history (before opening the other one), save
+  // yours as a copy next to it, or replace it.
+  if (req.resolve === 'mine-in-history' && ctx.path) {
+    try {
+      await format.snapshotEntries(userDir('history'), ctx.path, entries, historyOpts());
+      return { path: ctx.path };
+    } catch (err) {
+      return { error: `Could not keep your version.\n${err.message}` };
+    }
+  }
+  if (req.resolve === 'copy' && ctx.path) {
+    const copy = besideName(ctx.path, 'my changes');
+    try {
+      ctx.stamp = await format.writeNotebookAsync(copy, entries);
+      ctx.saved = entries;
+      ctx.path = copy;
+      return { path: copy, bytes: ctx.stamp.size };
+    } catch (err) {
+      return { error: `Could not save your copy.\n${err.message}` };
     }
   }
 
@@ -602,21 +787,27 @@ ipcMain.handle('notebook:save', async (e, req) => {
     if (!/\.ntb$/i.test(target)) target += '.ntb';
     if (openElsewhere(ctx, target)) return { error: 'That notebook is open in another window. Choose another name.' };
   }
+  if (!req.saveAs && req.resolve !== 'overwrite' && samePath(target, ctx.path) && ctx.stamp && format.changedSince(target, ctx.stamp)) {
+    return { conflict: true, path: target };
+  }
   try {
     const key = path.resolve(target).toLowerCase();
-    // Keep the file as it was before this save, at most every ten minutes (or when asked, after a restore).
-    if (fs.existsSync(target) && (req.snapshot || Date.now() - (ctx.snapshots.get(key) || 0) > SNAPSHOT_EVERY)) {
-      format.snapshot(userDir('history'), target, settings.historyLimit);
+    // Keep the file as it was before this save, at most every ten minutes (or when asked: after a restore,
+    // or when replacing a copy changed elsewhere).
+    if (fs.existsSync(target) && (req.snapshot || req.resolve === 'overwrite' || Date.now() - (ctx.snapshots.get(key) || 0) > SNAPSHOT_EVERY)) {
+      format.snapshot(userDir('history'), target, historyOpts());
       ctx.snapshots.set(key, Date.now());
     }
-    await format.writeNotebookAsync(target, entries);
+    ctx.stamp = await format.writeNotebookAsync(target, entries);
+    ctx.saved = entries;
     ctx.path = target;
-    return { path: target };
+    return { path: target, bytes: ctx.stamp.size };
   } catch (err) {
     return { error: `Could not save the notebook.\n${err.message}` };
   }
 });
 
+ipcMain.handle('history:usage', () => format.historyUsage(userDir('history')));
 ipcMain.handle('history:list', (e) => {
   const ctx = ctxOf(e);
   return ctx.path ? format.listHistory(userDir('history'), ctx.path) : [];
@@ -680,6 +871,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.on('window-all-closed', () => app.quit());
+  app.on('will-quit', flushSettings);
 }
 
 // For the tests: open a window as at startup.

@@ -54,18 +54,7 @@ function applyPaper() {
   setSeg('paper-style', p.paper);
   setSeg('page-mode', p.mode);
   document.body.dataset.mode = p.mode;
-  document
-    .querySelectorAll('#paper-colors .swatch')
-    .forEach((s) => s.setAttribute('aria-checked', String(s.dataset.value === state.nb.paperColor)));
-  const own = !Model.PAPER_COLORS[state.nb.paperColor];
-  $('paper-custom-wrap').setAttribute('aria-checked', String(own));
-  if (own) $('paper-custom').value = Model.paperHex(state.nb.paperColor);
-  document
-    .querySelectorAll('#paper-textures .texture')
-    .forEach((b) => {
-      b.setAttribute('aria-checked', String(b.dataset.value === (state.nb.paperTexture || 'none')));
-      b.style.backgroundColor = Model.paperHex(state.nb.paperColor);
-    });
+  syncPaperPickers();
 }
 
 // An empty page shows a faint motif.

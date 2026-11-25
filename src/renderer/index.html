@@ -58,22 +58,23 @@
 
   <div id="dragbar" aria-hidden="true"></div>
 
-  <!-- The title bar: where you are (notebook / section / page) on the left, the page's type and paper in the middle,
-       what you can do on the right. -->
+  <!-- The title bar: where you are (notebook › section › page) on the left, the page's type and paper in the middle,
+       the notebook's actions on the right. Saving and zoom are in the status bar at the bottom. -->
   <header id="topbar" aria-label="Notebook">
     <div class="tb-left">
       <button class="btn icon" data-cmd="home" title="Home (Ctrl+H)" aria-label="Home"><svg class="ic"><use href="#i-home"/></svg></button>
       <button class="btn icon" id="btn-sidebar" data-cmd="toggle-sidebar" title="Sections and pages (Ctrl+\)" aria-label="Show or hide sections and pages"><svg class="ic"><use href="#i-sidebar"/></svg></button>
-      <span class="crumbs">
+      <span class="tb-divider" aria-hidden="true"></span>
+      <nav class="crumbs" aria-label="Where you are">
         <button id="nb-name" title="Rename notebook"><span>Untitled</span><svg class="ic"><use href="#i-edit"/></svg></button>
-        <span class="crumb-sep" aria-hidden="true">/</span>
+        <svg class="ic crumb-sep" aria-hidden="true"><use href="#i-chevron"/></svg>
         <span id="crumb-section"></span>
-        <span class="crumb-sep sec-sep" aria-hidden="true">/</span>
+        <svg class="ic crumb-sep sec-sep" aria-hidden="true"><use href="#i-chevron"/></svg>
         <input id="page-title" type="text" maxlength="120" placeholder="Page title" spellcheck="false" aria-label="Page title">
-      </span>
+      </nav>
     </div>
     <!-- The open page's type and paper, in the middle of the bar. -->
-    <div class="page-opts">
+    <div class="page-opts" role="group" aria-label="Page setup">
       <div class="seg small" id="page-mode" role="radiogroup" aria-label="Page type">
         <button data-value="paged" role="radio" title="A4 sheets with page breaks">Paged</button>
         <button data-value="infinite" role="radio" title="One continuous page that fills the window and keeps growing">Infinite</button>
@@ -87,15 +88,9 @@
       </div>
     </div>
     <div class="tb-right">
-      <span id="save-state" data-state="saved" title="All changes saved"><i aria-hidden="true"></i><span></span></span>
-      <div id="zoom-ctl" role="group" aria-label="Zoom">
-        <button class="btn icon small" data-cmd="zoom-out" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
-        <button class="btn small" id="zoom-value" data-cmd="zoom-reset" title="Fit the page to the window (Ctrl+0)">100%</button>
-        <button class="btn icon small" data-cmd="zoom-in" title="Zoom in (Ctrl+=)" aria-label="Zoom in">+</button>
-      </div>
       <button class="btn icon" id="btn-search" data-cmd="find" title="Search this notebook (Ctrl+F)" aria-label="Search" aria-haspopup="dialog" aria-expanded="false"><svg class="ic"><use href="#i-search"/></svg></button>
-      <button class="btn icon" data-cmd="export-pdf" title="Export as PDF (Ctrl+E)" aria-label="Export as PDF"><svg class="ic"><use href="#i-download"/></svg></button>
-      <button class="btn icon" id="btn-view" data-cmd="settings" title="Settings, export and more (Ctrl+,)" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
+      <button class="btn icon" id="btn-export" data-cmd="export" title="Export as PDF, image or Markdown, or print (Ctrl+E)" aria-label="Export"><svg class="ic"><use href="#i-download"/></svg></button>
+      <button class="btn icon" id="btn-view" data-cmd="settings" title="Settings (Ctrl+,)" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
     </div>
   </header>
 
@@ -135,7 +130,7 @@
               <button class="del" title="Delete text box" aria-label="Delete text box"><svg class="ic"><use href="#i-close"/></svg></button>
             </div>
           </div>
-          <button id="extend" data-cmd="extend-page" title="Add another A4 sheet to the end of this page"><svg class="ic"><use href="#i-plus"/></svg>Add a sheet</button>
+          <button id="extend" data-cmd="extend-page" title="Add another A4 sheet to the end of this page"><svg class="ic"><use href="#i-plus"/></svg><span>Add a sheet</span><small></small></button>
         </div>
       </main>
       <!-- The tool bar: the tools, and beside them the chosen tool's options. It docks to any edge of the page area
@@ -233,6 +228,7 @@
         <header class="home-top">
           <div class="brand"><svg class="logo" aria-hidden="true"><use href="#i-logo"/></svg><span class="brand-name">Jotter</span></div>
           <div class="home-actions">
+            <button class="big primary" data-cmd="new"><svg class="ic"><use href="#i-plus"/></svg>New notebook</button>
             <button class="big" data-cmd="open"><svg class="ic"><use href="#i-folder"/></svg>Open…</button>
             <button class="btn icon" data-cmd="settings" title="Settings (Ctrl+,)" aria-label="Settings"><svg class="ic"><use href="#i-sliders"/></svg></button>
           </div>
@@ -280,6 +276,23 @@
     </main>
   </div>
 
+  <!-- The status bar: where you are in the notebook and the page's size on the left; saving and zoom on the right. -->
+  <footer id="statusbar" aria-label="Status">
+    <div class="sb-left">
+      <span id="sb-where"></span>
+      <span class="sb-sep" aria-hidden="true"></span>
+      <span id="sb-page"></span>
+    </div>
+    <div class="sb-right">
+      <span id="save-state" data-state="saved" title="All changes saved" role="status"><i aria-hidden="true"></i><span>All changes saved</span></span>
+      <span class="sb-sep" aria-hidden="true"></span>
+      <div id="zoom-ctl" role="group" aria-label="Zoom">
+        <button class="btn icon small" data-cmd="zoom-out" title="Zoom out (Ctrl+-)" aria-label="Zoom out">−</button>
+        <button class="btn small" id="zoom-value" data-cmd="zoom-reset" title="Fit the page to the window (Ctrl+0)">100%</button>
+        <button class="btn icon small" data-cmd="zoom-in" title="Zoom in (Ctrl+=)" aria-label="Zoom in">+</button>
+      </div>
+    </div>
+  </footer>
 
   <span id="status-msg" role="status" aria-live="polite"></span>
 
@@ -334,140 +347,219 @@
 
   <!-- Dialogs -->
   <dialog id="ask" aria-labelledby="ask-title">
-    <h2 id="ask-title"></h2>
-    <p id="ask-detail"></p>
-    <label class="field" id="ask-field" hidden><span class="panel-label" id="ask-label"></span><input id="ask-input" type="text" spellcheck="false"></label>
-    <div class="ask-choices" id="ask-choices" hidden></div>
+    <div class="dialog-body">
+      <h2 id="ask-title"></h2>
+      <p id="ask-detail"></p>
+      <label class="field" id="ask-field" hidden><span class="field-label" id="ask-label"></span><input id="ask-input" type="text" spellcheck="false"></label>
+      <div class="ask-choices" id="ask-choices" role="group" hidden></div>
+    </div>
     <div class="dialog-buttons" id="ask-buttons"></div>
   </dialog>
 
   <dialog id="cover-dialog" aria-labelledby="cover-title">
-    <h2 id="cover-title">New notebook</h2>
-    <label class="field" id="cover-name-row">
-      <span class="panel-label">Name</span>
-      <input id="cover-name" type="text" maxlength="120" placeholder="Untitled" spellcheck="false">
-    </label>
-    <div class="panel-label">Cover</div>
-    <div id="cover-grid" role="radiogroup" aria-label="Cover"></div>
+    <div class="dialog-body">
+      <h2 id="cover-title">New notebook</h2>
+      <label class="field" id="cover-name-row">
+        <span class="field-label">Name</span>
+        <input id="cover-name" type="text" maxlength="120" placeholder="Untitled" spellcheck="false">
+      </label>
+      <div class="field-label">Cover</div>
+      <div id="cover-grid" role="radiogroup" aria-label="Cover"></div>
+    </div>
     <form method="dialog" class="dialog-buttons">
       <button class="big" value="cancel">Cancel</button>
       <button class="big primary" id="cover-ok" value="ok">Create</button>
     </form>
   </dialog>
 
-  <dialog id="settings-dialog" aria-labelledby="settings-title">
-    <h2 id="settings-title">Settings</h2>
-    <div class="settings">
-      <section id="set-notebook">
-        <h3>This notebook</h3>
-        <div class="set-row"><span>Cover<small id="set-cover-name"></small></span><button class="big" type="button" data-cmd="change-cover">Change…</button></div>
-        <div class="set-row"><span>Paper colour<small>Or pick any colour of your own.</small></span><div id="paper-colors" role="radiogroup" aria-label="Paper colour"><label class="custom-color" id="paper-custom-wrap" title="Your own paper colour"><input type="color" id="paper-custom" value="#fff8e7" aria-label="Your own paper colour"></label></div></div>
-        <div class="set-row"><span>Paper texture</span><div id="paper-textures" role="radiogroup" aria-label="Paper texture"></div></div>
-        <div class="set-row"><span>Earlier versions<small>Kept automatically while you work.</small></span><button class="big" type="button" data-cmd="history">Version history…</button></div>
-        <div class="set-row"><span>Export and print<small>Export as PDF is also in the top bar (Ctrl+E).</small></span><span class="set-actions">
-          <button class="big" type="button" data-cmd="export-png">Page image</button>
-          <button class="big" type="button" data-cmd="export-md">Markdown</button>
-          <button class="big" type="button" data-cmd="print">Print</button>
-          <button class="big" type="button" data-cmd="save-copy">Copy…</button>
-        </span></div>
-        <div class="set-row"><span>View</span><span class="set-actions">
-          <button class="big" type="button" id="btn-focus" data-cmd="toggle-focus" aria-pressed="false">Focus mode</button>
-          <button class="big" type="button" id="btn-fullscreen" data-cmd="toggle-fullscreen" aria-pressed="false">Full screen</button>
-          <button class="big" type="button" data-cmd="new-window">New window</button>
-        </span></div>
-      </section>
-      <section>
-        <h3>Appearance</h3>
-        <div class="set-row"><span>App theme</span>
-          <div class="seg" id="theme" role="radiogroup" aria-label="App theme"><button data-value="system" role="radio">System</button><button data-value="light" role="radio">Light</button><button data-value="dark" role="radio">Dark</button></div></div>
-        <div class="set-row"><span>Interface size</span>
-          <div class="seg" id="ui-scale" role="radiogroup" aria-label="Interface size"><button data-value="1" role="radio">Normal</button><button data-value="1.15" role="radio">Large</button><button data-value="1.3" role="radio">Larger</button></div></div>
-        <div class="set-row"><span>Tool bar<small>Or drag its grip to any edge.</small></span>
-          <div class="seg" id="set-dock" role="radiogroup" aria-label="Tool bar position"><button data-value="left" role="radio">Left</button><button data-value="top" role="radio">Top</button><button data-value="bottom" role="radio">Bottom</button><button data-value="right" role="radio">Right</button></div></div>
-      </section>
-      <section>
-        <h3>New notebooks</h3>
-        <div class="set-row"><span>Cover</span><select id="set-cover" aria-label="Default cover"></select></div>
-        <div class="set-row"><span>Page type</span>
-          <div class="seg" id="set-mode" role="radiogroup" aria-label="Default page type"><button data-value="paged" role="radio">Paged</button><button data-value="infinite" role="radio">Infinite</button></div></div>
-        <div class="set-row"><span>Lines</span><select id="set-paper" aria-label="Default lines"><option value="plain">Plain</option><option value="ruled">Ruled</option><option value="grid">Grid</option><option value="dotted">Dots</option><option value="kolam">Kolam dots</option></select></div>
-      </section>
-      <section>
-        <h3>Notebooks</h3>
-        <div class="set-row"><span>Folder<small id="set-library" title=""></small></span><span class="set-actions"><button class="big" type="button" data-cmd="library-open">Show</button><button class="big" type="button" data-cmd="library-change">Change…</button></span></div>
-        <div class="set-row"><span>Versions to keep<small>Every notebook saves itself as you work.</small></span><select id="set-history" aria-label="Versions to keep"><option value="10">10</option><option value="30">30</option><option value="100">100</option></select></div>
-      </section>
-      <section>
-        <h3>Pen and touch</h3>
-        <label class="set-row"><span>Draw with the pen only<small>Fingers scroll the page instead of drawing.</small></span><input type="checkbox" class="switch" id="set-penonly"></label>
-        <label class="set-row"><span>Hide the tool bar when not in use<small>It slides away and comes back when you point at its edge.</small></span><input type="checkbox" class="switch" id="set-dockhide"></label>
-      </section>
+  <!-- Export: one dialog with every choice in view, remembered for next time. -->
+  <dialog id="export-dialog" aria-labelledby="export-title">
+    <div class="dialog-body">
+      <h2 id="export-title">Export</h2>
+      <p class="dialog-sub" id="export-sub"></p>
+      <div class="form-row">
+        <div class="field-label" id="export-format-label">Format</div>
+        <div class="seg wide" id="export-format" role="radiogroup" aria-labelledby="export-format-label">
+          <button data-value="pdf" role="radio">PDF</button>
+          <button data-value="png" role="radio">Page image</button>
+          <button data-value="md" role="radio">Markdown</button>
+          <button data-value="print" role="radio">Print</button>
+        </div>
+      </div>
+      <div class="form-row" id="export-scope-row">
+        <div class="field-label" id="export-scope-label">Include</div>
+        <div class="options" id="export-scope" role="radiogroup" aria-labelledby="export-scope-label"></div>
+      </div>
+      <div class="form-row" id="export-infinite-row">
+        <div class="field-label" id="export-infinite-label">Infinite pages</div>
+        <div class="options" id="export-infinite" role="radiogroup" aria-labelledby="export-infinite-label"></div>
+      </div>
+      <div class="form-row" id="export-look-row">
+        <div class="field-label" id="export-look-label">Background</div>
+        <div class="options" id="export-look" role="radiogroup" aria-labelledby="export-look-label"></div>
+      </div>
     </div>
     <div class="dialog-buttons">
-      <button class="link" type="button" data-cmd="shortcuts">Keyboard shortcuts</button>
-      <button class="link" type="button" data-cmd="about">About Jotter</button>
-      <span class="grow"></span>
-      <form method="dialog"><button class="big primary">Done</button></form>
+      <button class="big" type="button" id="export-cancel">Cancel</button>
+      <button class="big primary" type="button" id="export-go">Export</button>
+    </div>
+  </dialog>
+
+  <!-- Settings: categories on the left, their settings on the right. Changes apply at once. -->
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="settings-shell">
+      <nav class="settings-nav" aria-label="Settings">
+        <h2 id="settings-title">Settings</h2>
+        <button type="button" data-pane="notebook" id="nav-notebook"><svg class="ic"><use href="#i-book"/></svg>This notebook</button>
+        <button type="button" data-pane="general"><svg class="ic"><use href="#i-sliders"/></svg>General</button>
+        <button type="button" data-pane="pen"><svg class="ic"><use href="#i-pen"/></svg>Pen and tool bar</button>
+        <button type="button" data-pane="new"><svg class="ic"><use href="#i-plus"/></svg>New notebooks</button>
+        <button type="button" data-pane="storage"><svg class="ic"><use href="#i-folder"/></svg>Storage and versions</button>
+        <span class="nav-gap"></span>
+        <button type="button" data-pane="shortcuts"><svg class="ic"><use href="#i-keyboard"/></svg>Keyboard shortcuts</button>
+        <button type="button" data-pane="about"><svg class="ic"><use href="#i-info"/></svg>About Jotter</button>
+      </nav>
+      <div class="settings-panes">
+        <section class="pane" data-pane="notebook" id="set-notebook" aria-labelledby="pane-notebook">
+          <header class="pane-head"><h3 id="pane-notebook">This notebook</h3><p>Settings for “<span id="set-nb-name"></span>” only.</p></header>
+          <h4>Paper</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Cover<small id="set-cover-name"></small></span><button class="big" type="button" data-cmd="change-cover">Change…</button></div>
+            <div class="set-row"><span>Paper colour<small>Four ready colours, or any colour of your own.</small></span><div class="paper-colors" id="paper-colors" role="radiogroup" aria-label="Paper colour"><label class="custom-color" id="paper-custom-wrap" title="Your own paper colour"><input type="color" id="paper-custom" value="#fff8e7" aria-label="Your own paper colour"></label></div></div>
+            <div class="set-row"><span>Paper texture</span><div class="paper-textures" id="paper-textures" role="radiogroup" aria-label="Paper texture"></div></div>
+            <div class="set-row"><span>Use for new notebooks<small id="paper-default-note">New notebooks start on this paper colour and texture.</small></span><button class="big" type="button" id="btn-paper-default">Use this paper</button></div>
+          </div>
+          <h4>File</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Version history<small>Earlier versions are kept while you work.</small></span><button class="big" type="button" data-cmd="history">Open…</button></div>
+            <div class="set-row"><span>Export<small>PDF, page image, Markdown, or print.</small></span><button class="big" type="button" data-cmd="export">Export…</button></div>
+            <div class="set-row"><span>Save a copy<small>A separate notebook file, wherever you choose.</small></span><button class="big" type="button" data-cmd="save-copy">Save a copy…</button></div>
+          </div>
+          <h4>View</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Focus mode<small>Only the page and the tools (Ctrl+Shift+F).</small></span><button class="big" type="button" id="btn-focus" data-cmd="toggle-focus" aria-pressed="false">Focus mode</button></div>
+            <div class="set-row"><span>Full screen<small>F11</small></span><button class="big" type="button" id="btn-fullscreen" data-cmd="toggle-fullscreen" aria-pressed="false">Full screen</button></div>
+            <div class="set-row"><span>New window<small>Two notebooks side by side.</small></span><button class="big" type="button" data-cmd="new-window">New window</button></div>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="general" aria-labelledby="pane-general">
+          <header class="pane-head"><h3 id="pane-general">General</h3><p>How Jotter looks and behaves.</p></header>
+          <h4>Appearance</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Theme<small>System follows Windows.</small></span>
+              <div class="seg" id="theme" role="radiogroup" aria-label="Theme"><button data-value="system" role="radio">System</button><button data-value="light" role="radio">Light</button><button data-value="dark" role="radio">Dark</button></div></div>
+            <div class="set-row"><span>Interface size</span>
+              <div class="seg" id="ui-scale" role="radiogroup" aria-label="Interface size"><button data-value="1" role="radio">Normal</button><button data-value="1.15" role="radio">Large</button><button data-value="1.3" role="radio">Larger</button></div></div>
+          </div>
+          <h4>Writing</h4>
+          <div class="set-group">
+            <label class="set-row"><span>Check spelling<small>Underline misspelt words as you type.</small></span><input type="checkbox" class="switch" id="set-spellcheck"></label>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="pen" aria-labelledby="pane-pen">
+          <header class="pane-head"><h3 id="pane-pen">Pen and tool bar</h3><p>Where the tools sit, and how pen and touch behave.</p></header>
+          <h4>Tool bar</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Position<small>Or drag the bar's grip to any edge.</small></span>
+              <div class="seg" id="set-dock" role="radiogroup" aria-label="Tool bar position"><button data-value="left" role="radio">Left</button><button data-value="top" role="radio">Top</button><button data-value="bottom" role="radio">Bottom</button><button data-value="right" role="radio">Right</button></div></div>
+            <label class="set-row"><span>Hide when not in use<small>It slides away and comes back when you point at its edge.</small></span><input type="checkbox" class="switch" id="set-dockhide"></label>
+          </div>
+          <h4>Pen and touch</h4>
+          <div class="set-group">
+            <label class="set-row"><span>Draw with the pen only<small>Fingers scroll the page instead of drawing.</small></span><input type="checkbox" class="switch" id="set-penonly"></label>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="new" aria-labelledby="pane-new">
+          <header class="pane-head"><h3 id="pane-new">New notebooks</h3><p>What a new notebook starts with.</p></header>
+          <div class="set-group">
+            <div class="set-row"><span>Cover</span><select id="set-cover" aria-label="Cover for new notebooks"></select></div>
+            <div class="set-row"><span>Page type</span>
+              <div class="seg" id="set-mode" role="radiogroup" aria-label="Page type for new notebooks"><button data-value="paged" role="radio">Paged</button><button data-value="infinite" role="radio">Infinite</button></div></div>
+            <div class="set-row"><span>Lines</span><select id="set-paper" aria-label="Lines for new notebooks"><option value="plain">Plain</option><option value="ruled">Ruled</option><option value="grid">Grid</option><option value="dotted">Dots</option><option value="kolam">Kolam dots</option></select></div>
+            <div class="set-row"><span>Paper colour</span><div class="paper-colors" id="new-paper-colors" role="radiogroup" aria-label="Paper colour for new notebooks"><label class="custom-color" id="new-paper-custom-wrap" title="Your own paper colour"><input type="color" id="new-paper-custom" value="#fff8e7" aria-label="Your own paper colour for new notebooks"></label></div></div>
+            <div class="set-row"><span>Paper texture</span><div class="paper-textures" id="new-paper-textures" role="radiogroup" aria-label="Paper texture for new notebooks"></div></div>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="storage" aria-labelledby="pane-storage">
+          <header class="pane-head"><h3 id="pane-storage">Storage and versions</h3><p>Where notebooks are kept, and how much history is kept with them.</p></header>
+          <h4>Notebooks folder</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Folder<small id="set-library" title=""></small></span><span class="set-actions"><button class="big" type="button" data-cmd="library-open">Show</button><button class="big" type="button" data-cmd="library-change">Change…</button></span></div>
+          </div>
+          <h4>Version history</h4>
+          <div class="set-group">
+            <div class="set-row"><span>Versions to keep<small>Every version from today; older ones thinned to one a day, then one a week.</small></span><select id="set-history" aria-label="Versions to keep"><option value="10">10</option><option value="30">30</option><option value="100">100</option></select></div>
+            <div class="set-row"><span>Space for each notebook's versions<small id="set-history-usage"></small></span><select id="set-history-budget" aria-label="Space for each notebook's versions"><option value="100">100 MB</option><option value="500">500 MB</option><option value="2000">2 GB</option><option value="5000">5 GB</option></select></div>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="shortcuts" aria-labelledby="pane-shortcuts">
+          <header class="pane-head"><h3 id="pane-shortcuts">Keyboard shortcuts</h3><p>F1 opens this list.</p></header>
+          <div class="keys">
+            <div><h4>Tools</h4><dl>
+              <dt><kbd>T</kbd> <kbd>P</kbd> <kbd>M</kbd> <kbd>E</kbd></dt><dd>Type, pen, marker, eraser</dd>
+              <dt><kbd>S</kbd> <kbd>L</kbd></dt><dd>Shapes, select ink</dd>
+              <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Smaller / larger</dd>
+              <dt><kbd>Shift</kbd> + draw</dt><dd>Straight line</dd>
+              <dt><kbd>Space</kbd> + drag</dt><dd>Move around the page</dd>
+              <dt><kbd>Ctrl+Z</kbd> <kbd>Ctrl+Y</kbd></dt><dd>Undo / redo</dd>
+              <dt><kbd>Ctrl+C</kbd> <kbd>X</kbd> <kbd>V</kbd> <kbd>D</kbd></dt><dd>Copy, cut, paste, duplicate ink</dd>
+            </dl></div>
+            <div><h4>Pages and sections</h4><dl>
+              <dt><kbd>Ctrl+PgUp</kbd> <kbd>Ctrl+PgDn</kbd></dt><dd>Previous / next page</dd>
+              <dt><kbd>Ctrl+Shift+N</kbd></dt><dd>New page</dd>
+              <dt><kbd>Ctrl+T</kbd></dt><dd>New section</dd>
+              <dt><kbd>↑</kbd> <kbd>↓</kbd> in a list</dt><dd>Move between items</dd>
+              <dt><kbd>F2</kbd> <kbd>Delete</kbd></dt><dd>Rename / delete</dd>
+              <dt><kbd>Ctrl+Shift+R</kbd></dt><dd>Rename section</dd>
+            </dl></div>
+            <div><h4>Notebook</h4><dl>
+              <dt><kbd>Ctrl+N</kbd> <kbd>Ctrl+O</kbd></dt><dd>New / open</dd>
+              <dt><kbd>Ctrl+F</kbd></dt><dd>Search</dd>
+              <dt><kbd>Ctrl+S</kbd></dt><dd>Save now</dd>
+              <dt><kbd>Ctrl+E</kbd> <kbd>Ctrl+P</kbd></dt><dd>Export / print</dd>
+              <dt><kbd>Ctrl+,</kbd></dt><dd>Settings</dd>
+            </dl></div>
+            <div><h4>View</h4><dl>
+              <dt><kbd>F11</kbd></dt><dd>Full screen</dd>
+              <dt><kbd>Ctrl+Shift+F</kbd></dt><dd>Focus mode</dd>
+              <dt><kbd>Ctrl+\</kbd></dt><dd>Show / hide sidebar</dd>
+              <dt><kbd>Ctrl+=</kbd> <kbd>Ctrl+-</kbd></dt><dd>Zoom in / out</dd>
+              <dt><kbd>Ctrl+0</kbd></dt><dd>Fit the page to the window</dd>
+              <dt><kbd>Ctrl+H</kbd></dt><dd>Home</dd>
+              <dt><kbd>Esc</kbd></dt><dd>Close a panel, leave focus mode</dd>
+            </dl></div>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="about" aria-labelledby="pane-about">
+          <div class="about">
+            <svg class="logo" aria-hidden="true"><use href="#i-logo"/></svg>
+            <h3 id="pane-about">Jotter</h3>
+            <p id="about-version"></p>
+            <p class="dialog-sub">A notebook for typing and handwriting. Notebooks are saved as .ntb files.</p>
+            <p class="dialog-sub">Twenty-four original covers: traditional designs drawn after Kolam, Warli, block print, jali, Madhubani, rangoli and Ajrakh, plus modern and nature designs.</p>
+            <button class="big" id="btn-licences" type="button">Open-source licences</button>
+          </div>
+        </section>
+      </div>
     </div>
   </dialog>
 
   <dialog id="history-dialog" aria-labelledby="history-title">
-    <h2 id="history-title">Version history</h2>
-    <p class="dialog-sub" id="history-sub"></p>
-    <ul id="history-list"></ul>
-    <form method="dialog" class="dialog-buttons"><button class="big">Close</button></form>
-  </dialog>
-
-  <dialog id="about-dialog" aria-labelledby="about-title">
-    <div class="about">
-      <svg class="logo" aria-hidden="true"><use href="#i-logo"/></svg>
-      <h2 id="about-title">Jotter</h2>
-      <p id="about-version"></p>
-      <p class="dialog-sub">A notebook for typing and handwriting. Notebooks are saved as .ntb files.</p>
-      <p class="dialog-sub">Twenty-four original covers: traditional designs drawn after Kolam, Warli, block print, jali, Madhubani, rangoli and Ajrakh, plus modern and nature designs.</p>
+    <div class="dialog-body">
+      <h2 id="history-title">Version history</h2>
+      <p class="dialog-sub" id="history-sub"></p>
+      <div id="history-list" role="list"></div>
     </div>
-    <div class="dialog-buttons"><button class="big" id="btn-licences" type="button">Open-source licences</button><button class="big primary" type="button" id="about-close">Close</button></div>
-  </dialog>
-
-  <dialog id="shortcuts" aria-labelledby="shortcuts-title">
-    <h2 id="shortcuts-title">Keyboard shortcuts</h2>
-    <div class="keys">
-      <div><h3>Tools</h3><dl>
-        <dt>T P M E</dt><dd>Type, pen, marker, eraser</dd>
-        <dt>S &nbsp; L</dt><dd>Shapes, select ink</dd>
-        <dt>[ &nbsp; ]</dt><dd>Smaller / larger</dd>
-        <dt>Shift + draw</dt><dd>Straight line</dd>
-        <dt>Space + drag</dt><dd>Move around the page</dd>
-        <dt>Ctrl+Z &nbsp; Ctrl+Y</dt><dd>Undo / redo</dd>
-        <dt>Ctrl+C X V D</dt><dd>Copy, cut, paste, duplicate ink</dd>
-      </dl></div>
-      <div><h3>Pages and sections</h3><dl>
-        <dt>Ctrl+PgUp &nbsp; Ctrl+PgDn</dt><dd>Previous / next page</dd>
-        <dt>Ctrl+Shift+N</dt><dd>New page</dd>
-        <dt>Ctrl+T</dt><dd>New section</dd>
-        <dt>↑ ↓ in a list</dt><dd>Move between items</dd>
-        <dt>F2 &nbsp; Delete</dt><dd>Rename / delete</dd>
-        <dt>Ctrl+Shift+R</dt><dd>Rename section</dd>
-        <dt>Right-click a section</dt><dd>Rename, colour, delete</dd>
-        <dt>Drag a page onto a section</dt><dd>Move it there</dd>
-      </dl>
-      <h3>Notebook</h3><dl>
-        <dt>Ctrl+N &nbsp; Ctrl+O</dt><dd>New / open</dd>
-        <dt>Ctrl+F</dt><dd>Search</dd>
-        <dt>Ctrl+S &nbsp; Ctrl+P</dt><dd>Save now / print</dd>
-        <dt>Ctrl+E</dt><dd>Export as PDF</dd>
-      </dl></div>
-      <div><h3>View</h3><dl>
-        <dt>F11</dt><dd>Full screen</dd>
-        <dt>Ctrl+Shift+F</dt><dd>Focus mode</dd>
-        <dt>Ctrl+\</dt><dd>Show / hide sidebar</dd>
-        <dt>Ctrl+= &nbsp; Ctrl+-</dt><dd>Zoom in / out</dd>
-        <dt>Ctrl+0</dt><dd>Fit the page to the window</dd>
-        <dt>Ctrl+H</dt><dd>Home</dd>
-        <dt>Esc</dt><dd>Close a panel, leave focus mode</dd>
-      </dl></div>
+    <div class="dialog-buttons">
+      <small class="grow" id="history-foot"></small>
+      <form method="dialog"><button class="big primary">Close</button></form>
     </div>
-    <form method="dialog" class="dialog-buttons"><button class="big primary">Close</button></form>
   </dialog>
 
   <div id="ring"></div>

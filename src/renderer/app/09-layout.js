@@ -59,7 +59,30 @@ function layoutSheets() {
       el.breaks.append(d);
     }
   }
+  syncExtend();
   updateTiles();
+}
+
+/*
+  A paged page holds up to MAX_PAGED A4 sheets. The button under the last sheet says how many there are,
+  and once the page is full it says so and starts a new page instead.
+*/
+function syncExtend() {
+  const p = page();
+  const full = p.sheets >= MAX_PAGED;
+  const b = $('extend');
+  b.dataset.full = String(full);
+  b.querySelector('span').textContent = full ? 'This page is full. Continue on a new page' : 'Add a sheet';
+  b.querySelector('small').textContent = `${p.sheets} of ${MAX_PAGED} sheets`;
+  b.title = full ? `A page holds up to ${MAX_PAGED} A4 sheets` : 'Add another A4 sheet to the end of this page';
+  $('sb-page').textContent = p.mode === 'infinite' ? 'Infinite page' : `A4 · ${plural(p.sheets, 'sheet')}`;
+}
+// Said once per page, when text or ink reaches the end of a full page.
+const warnedFull = new WeakSet();
+function warnFull(p, what) {
+  if (warnedFull.has(p)) return;
+  warnedFull.add(p);
+  flash(`${what} Continue on a new page (Ctrl+Shift+N).`);
 }
 
 // Size of the ink area: `w` wide (sheet px), text column starting `ox` from its left, canvases at scale `s`.
@@ -162,7 +185,9 @@ const contentSheets = (p, textEl) => Math.max(1, Math.ceil((contentBottom(p, tex
 // Paged: give the page more sheets when the text runs past the bottom.
 function growToFit() {
   const p = page();
-  const needed = Math.min(MAX_PAGED, Math.ceil((el.editor.scrollHeight - 1) / H));
+  const want = Math.ceil((el.editor.scrollHeight - 1) / H);
+  if (want > MAX_PAGED) warnFull(p, `This page is full (${MAX_PAGED} A4 sheets): text past the end will not show in PDFs.`);
+  const needed = Math.min(MAX_PAGED, want);
   if (needed > p.sheets) {
     p.sheets = needed;
     layoutSheets();
@@ -173,6 +198,7 @@ function growToFit() {
 function ensureRoom(y) {
   const p = page();
   if (p.mode !== 'infinite') return;
+  if (Math.ceil((y + ROOM) / H) > MAX_INFINITE) warnFull(p, 'This infinite page has reached its full length.');
   const wanted = Math.min(MAX_INFINITE, Math.ceil((y + ROOM) / H));
   if (wanted > p.sheets) {
     p.sheets = wanted;
@@ -183,7 +209,7 @@ function ensureRoom(y) {
 function extendPage() {
   const p = page();
   if (p.mode === 'infinite') return flash('Infinite pages grow by themselves as you scroll.');
-  if (p.sheets >= MAX_PAGED) return flash('This page has reached its maximum length. Add a new page instead.');
+  if (p.sheets >= MAX_PAGED) return addPage();
   p.sheets += 1;
   layoutSheets();
   markDirty();

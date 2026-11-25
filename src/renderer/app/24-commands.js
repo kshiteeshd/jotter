@@ -43,10 +43,11 @@ const commands = {
     if (state.view === 'home') renderHome(await api.listRecents());
   },
   history: openHistory,
-  'export-pdf': exportPdf,
-  'export-png': exportPng,
-  'export-md': exportMarkdown,
-  print: printNotebook,
+  export: () => openExport(),
+  'export-pdf': () => openExport({ format: 'pdf' }),
+  'export-png': () => openExport({ format: 'png' }),
+  'export-md': () => openExport({ format: 'md' }),
+  print: () => openExport({ format: 'print' }),
   'change-cover': async () => {
     const pick = await pickCover({ title: 'Change cover', ok: 'Apply', askName: false, cover: state.nb.cover });
     if (!pick || pick.cover === state.nb.cover) return;
@@ -80,6 +81,7 @@ const commands = {
   'zoom-reset': () => {
     state.userZoomed = false;
     setZoom(fitZoom());
+    rememberZoom();
   },
   'toggle-sidebar': () => applySettings({ sidebar: !state.settings.sidebar }),
   'toggle-rail': () => setRailCollapsed(!document.body.classList.contains('rail-collapsed')),
@@ -88,8 +90,8 @@ const commands = {
   'toggle-view-panel': () => openSettings(),
   find: () => (el.searchPanel.hidden ? openSearch() : closePopovers()),
   settings: openSettings,
-  shortcuts: () => $('shortcuts').showModal(),
-  about: openAbout,
+  shortcuts: () => openSettings('shortcuts'),
+  about: () => openSettings('about'),
   'new-window': () => api.newWindow(),
   'insert-checklist': insertChecklist,
   'insert-table': () => insertTable(),
@@ -102,8 +104,8 @@ const commands = {
 };
 // Commands that show dialogs or replace the notebook must not overlap.
 const MODAL = new Set([
-  'quick-new', 'trash', 'save-copy', 'library-change', 'rename', 'change-cover', 'new', 'open', 'save', 'save-as', 'history', 'export-pdf', 'export-png', 'export-md',
-  'print', 'request-close', 'clear-ink', 'delete-page', 'delete-section', 'insert-link',
+  'quick-new', 'trash', 'save-copy', 'library-change', 'rename', 'change-cover', 'new', 'open', 'save', 'save-as', 'history', 'export', 'export-pdf', 'export-png', 'export-md',
+  'print', 'request-close', 'clear-ink', 'delete-page', 'delete-section', 'insert-link', 'reload-changed',
 ]);
 // Commands that work without an open notebook on screen.
 const ANYWHERE = new Set(['undo', 'redo', 'quick-new', 'trash', 'library-open', 'library-change', 'new', 'open', 'home', 'back', 'request-close', 'toggle-fullscreen', 'toggle-view-panel', 'settings', 'shortcuts', 'about', 'new-window']);

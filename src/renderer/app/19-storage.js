@@ -4,19 +4,20 @@
   Send the notebook to the main process. Pages and images it already holds go by name only; if it
   turns out to be missing some (for example after an error), everything is sent once more.
 */
-async function sendSave({ saveAs = false, draft = false, copy = false } = {}) {
+async function sendSave({ saveAs = false, draft = false, copy = false, resolve = null } = {}) {
   commitEditor();
   const opts = { extra: draft && state.path ? { draftOf: state.path } : {} };
-  const base = { path: state.path, saveAs, draft, copy, suggestedName: notebookName(), snapshot: state.forceSnapshot };
+  const base = { path: state.path, saveAs, draft, copy, resolve, suggestedName: notebookName(), snapshot: state.forceSnapshot };
   let built = Model.buildSave(state.nb, sent, opts);
   let res = await api.saveNotebook({ ...built.request, ...base });
   if (res && res.resend) {
     built = Model.buildSave(state.nb, sent, { ...opts, full: true });
     res = await api.saveNotebook({ ...built.request, ...base });
   }
-  if (res && !res.error && !res.resend) {
+  if (res && !res.error && !res.resend && !res.conflict) {
     built.commit();
     if (!draft) state.forceSnapshot = false;
+    if (res.bytes) state.lastBytes = res.bytes;
   }
   return res;
 }
@@ -30,17 +31,20 @@ async function writeDraft() {
   }
 }
 
-async function saveNotebook(saveAs = false, silent = false) {
+async function saveNotebook(saveAs = false, silent = false, resolve = null) {
   if (silent && !state.path) return false;
+  if (silent && state.conflict && !resolve) return false;
   const changes = state.changes;
   state.saving = true;
   syncChrome();
   let res;
   try {
-    res = await sendSave({ saveAs });
+    res = await sendSave({ saveAs, resolve });
   } finally {
     state.saving = false;
   }
+  if (res && res.conflict) return resolveConflict();
+  if (res && !res.error) state.conflict = false;
   state.saveFailed = !!(res && res.error);
   if (!res || res.error) {
     syncChrome();
@@ -49,11 +53,12 @@ async function saveNotebook(saveAs = false, silent = false) {
     return false;
   }
   state.path = res.path;
+  clearTimeout(draftTimer);
   if (state.changes === changes) {
     state.dirty = false;
     clearTimeout(autoTimer);
   } else {
-    autoTimer = setTimeout(autoTick, AUTOSAVE_DELAY);
+    autoTimer = setTimeout(autoTick, autosaveDelay());
   }
   api.clearDraft();
   syncChrome();
@@ -63,6 +68,76 @@ async function saveNotebook(saveAs = false, silent = false) {
   }
   return true;
 }
+
+/*
+  The notebook's file was changed outside Jotter since it was opened or saved: by OneDrive or another sync
+  tool bringing in an edit made on another computer, or by another program. Nothing is written over it
+  without asking. Keeping both is the safe choice; whichever version is not kept stays in Version history.
+*/
+async function resolveConflict() {
+  if (state.conflictAsking) return false;
+  state.conflictAsking = true;
+  state.conflict = true;
+  syncChrome();
+  try {
+    const name = notebookName();
+    const r = await ask({
+      message: 'This notebook was changed outside Jotter',
+      detail: `“${name}” changed on disk after you opened it, for example by OneDrive syncing an edit made on another computer. Your changes have not been saved over it.`,
+      buttons: ['Keep both', 'Replace it with my version', 'Open the changed version', 'Decide later'],
+      notes: [
+        `Your version is saved next to it as “${name} (my changes)”`,
+        'The changed version is kept in Version history',
+        'Your version is kept in Version history',
+      ],
+      cancelId: 3,
+    });
+    if (r === 0 || r === 1) {
+      state.conflict = false;
+      const ok = await saveNotebook(false, true, r === 0 ? 'copy' : 'overwrite');
+      if (ok) {
+        touchRecent();
+        flash(r === 0 ? `Your version is saved as “${notebookName()}”` : 'Saved your version');
+      }
+      return ok;
+    }
+    if (r === 2) {
+      const kept = await sendSave({ resolve: 'mine-in-history' });
+      if (!kept || kept.error) {
+        if (kept) await showError(kept.error);
+        return false;
+      }
+      state.conflict = false;
+      state.dirty = false;
+      await reloadFromDisk('Opened the changed version. Yours is in Version history.');
+      return true;
+    }
+    flash('Not saved: the notebook changed outside Jotter. Save (Ctrl+S) to decide.');
+    return false;
+  } finally {
+    state.conflictAsking = false;
+    syncChrome();
+  }
+}
+
+// Read the open notebook again from its file, staying on the same page and spot.
+async function reloadFromDisk(message) {
+  const at = placeNow();
+  const file = await api.readNotebook(state.path);
+  if (file.error) return showError(file.error);
+  clearTimeout(autoTimer);
+  clearTimeout(draftTimer);
+  api.clearDraft();
+  if (await loadFile({ ...file, at })) flash(message);
+}
+
+// Coming back to Jotter: if the notebook changed elsewhere meanwhile and you have nothing unsaved, show
+// the new version. (With unsaved changes, the next save asks.)
+window.addEventListener('focus', async () => {
+  if (!state.nb || !state.path || state.view !== 'editor' || state.dirty || busy || state.saving) return;
+  const r = await api.checkFile();
+  if (r.changed && !state.dirty && !busy) run('reload-changed', () => reloadFromDisk('Updated with changes made outside Jotter'));
+});
 
 async function saveCopy() {
   const res = await sendSave({ copy: true });
@@ -96,6 +171,9 @@ async function leaveNotebook() {
 
 function setNotebook(nb, path, dirty = false) {
   clearTimeout(autoTimer);
+  clearTimeout(draftTimer);
+  state.conflict = false;
+  state.lastBytes = 0;
   state.nb = nb;
   state.path = path;
   state.untitledName = '';
@@ -119,6 +197,7 @@ async function loadFile(file, dirty = false, pathOverride) {
   }
   let nb;
   try {
+    Model.Images.clear(); // the pictures of the notebook being left (its undo history goes too)
     nb = Model.parse(file, Covers.ids);
   } catch (err) {
     const why = err instanceof SyntaxError ? 'The file is damaged or is not a Jotter notebook.' : err.message;
